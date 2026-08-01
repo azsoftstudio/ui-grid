@@ -1,0 +1,20 @@
+=============================================================
+
+Quick Start:
+1. Open Unity
+2. Go to Tools → UI Furnace → Grid Manager
+3. Enable Grid
+4. Choose a grid mode
+5. Start moving UI elements
+
+=============================================================
+This is an Editor-only tool and does not affect runtime.
+=============================================================
+
+Limitations:
+1. Snap to Grid currently supports precise positioning. Advanced resizing workflows may be expanded in future updates
+
+2. Single-Canvas Data
+
+=============================================================
+Contact: https://www.azsoftstudio.workers.dev/contact
