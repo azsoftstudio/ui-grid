@@ -803,8 +803,8 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 					}
 				}
 
-				// #7 â€” Scene View HUD: movable GUI window over the scene
-				if (GridSettings.IsEditModeActive)
+				// #7 — Scene View HUD: movable GUI window over the scene
+				if (GridSettings.CurrentMode == GridMode.CustomLines && GridSettings.IsEditModeActive)
 					DrawEditModeHUD();
 			}
 			finally
@@ -1284,7 +1284,7 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 		// â”€â”€â”€ Interactive Dynamic Mode Events â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 		private static void HandleDynamicGridEvents(Event e, int controlID, Vector3 BL, Vector3 TL, Vector3 TR, Vector3 BR, float localWidth, float localHeight)
 		{
-			if (!GridSettings.IsEditModeActive) return;
+			if (GridSettings.CurrentMode != GridMode.CustomLines || !GridSettings.IsEditModeActive) return;
 
 			Vector3 center     = (BL + TR) * 0.5f;
 			Vector3 rightDir   = BR - BL;
@@ -2246,7 +2246,7 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 		[MenuItem("Tools/UI Furnace/[Grid] Add Horizontal Line &h", false, 11)]
 		private static void StartAddingHorizontalLine()
 		{
-			if (!GridSettings.IsEditModeActive) return;
+			if (GridSettings.CurrentMode != GridMode.CustomLines || !GridSettings.IsEditModeActive) return;
 			s_IsAddingLine = true;
 			s_AddingLineIsVertical = false;
 			
@@ -2264,12 +2264,12 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 		}
 
 		[MenuItem("Tools/UI Furnace/[Grid] Add Horizontal Line &h", true, 11)]
-		private static bool ValidateAddHorizontalLine() => GridSettings.IsEditModeActive;
+		private static bool ValidateAddHorizontalLine() => GridSettings.CurrentMode == GridMode.CustomLines && GridSettings.IsEditModeActive;
 
 		[MenuItem("Tools/UI Furnace/[Grid] Add Vertical Line &v", false, 12)]
 		private static void StartAddingVerticalLine()
 		{
-			if (!GridSettings.IsEditModeActive) return;
+			if (GridSettings.CurrentMode != GridMode.CustomLines || !GridSettings.IsEditModeActive) return;
 			s_IsAddingLine = true;
 			s_AddingLineIsVertical = true;
 			
@@ -2287,12 +2287,12 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 		}
 
 		[MenuItem("Tools/UI Furnace/[Grid] Add Vertical Line &v", true, 12)]
-		private static bool ValidateAddVerticalLine() => GridSettings.IsEditModeActive;
+		private static bool ValidateAddVerticalLine() => GridSettings.CurrentMode == GridMode.CustomLines && GridSettings.IsEditModeActive;
 
 		[MenuItem("Tools/UI Furnace/[Grid] Delete Selected Lines &BACKSPACE", false, 13)]
 		public static void DeleteSelectedLines()
 		{
-			if (!GridSettings.IsEditModeActive || s_IsAddingLine) return;
+			if (GridSettings.CurrentMode != GridMode.CustomLines || !GridSettings.IsEditModeActive || s_IsAddingLine) return;
 			
 			if (SelectedIndicesX.Count > 0 || SelectedIndicesY.Count > 0)
 			{
@@ -2351,20 +2351,20 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 		}
 
 		[MenuItem("Tools/UI Furnace/[Grid] Delete Selected Lines &BACKSPACE", true, 13)]
-		private static bool ValidateDeleteSelectedLines() => GridSettings.IsEditModeActive && (SelectedIndicesX.Count > 0 || SelectedIndicesY.Count > 0);
+		private static bool ValidateDeleteSelectedLines() => GridSettings.CurrentMode == GridMode.CustomLines && GridSettings.IsEditModeActive && (SelectedIndicesX.Count > 0 || SelectedIndicesY.Count > 0);
 
-		// #8 â€” Mirror Mode menu item (so it also appears in Tools > UI Furnace)
+		// #8 — Mirror Mode menu item (so it also appears in Tools > UI Furnace)
 		[MenuItem("Tools/UI Furnace/[Grid] Toggle Mirror Mode &m", false, 14)]
 		private static void ToggleMirrorModeMenuItem()
 		{
-			if (!GridSettings.IsEditModeActive) return;
+			if (GridSettings.CurrentMode != GridMode.CustomLines || !GridSettings.IsEditModeActive) return;
 			GridSettings.IsMirrorModeActive = !GridSettings.IsMirrorModeActive;
 			SceneView.RepaintAll();
 			foreach (var win in Resources.FindObjectsOfTypeAll<GridManagerWindow>()) win.CreateGUI();
 		}
 
 		[MenuItem("Tools/UI Furnace/[Grid] Toggle Mirror Mode &m", true, 14)]
-		private static bool ValidateToggleMirrorMode() => GridSettings.IsEditModeActive;
+		private static bool ValidateToggleMirrorMode() => GridSettings.CurrentMode == GridMode.CustomLines && GridSettings.IsEditModeActive;
 		
 		private static void ExitEditMode()
 		{

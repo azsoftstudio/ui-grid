@@ -110,80 +110,14 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 			_layoutCardSlot.Add(CreateGridLayoutCard());
 			root.Add(_layoutCardSlot);
 
-
 			// =========================================================================
-			// 3. INTERACTION & EDITING (The Tools)
+			// 3. UI INTERACTION (Snapping UI Elements)
 			// =========================================================================
-			var interactionFoldout = new Foldout { text = "Interaction & Editing", value = !GridSettings.InteractionCollapsed, style = { marginTop = 8 } };
+			var interactionFoldout = new Foldout { text = "UI Interaction", value = !GridSettings.InteractionCollapsed, style = { marginTop = 8 } };
 			interactionFoldout.RegisterValueChangedCallback(evt => GridSettings.SaveCollapseState("Interaction", !evt.newValue));
 			root.Add(interactionFoldout);
 
 			var interactionGroup = new VisualElement { style = { marginLeft = 15 } };
-			
-			var subToolsGroup = new VisualElement()
-			{
-				style =
-				{
-					marginLeft = 8, flexDirection = FlexDirection.Column,
-					borderLeftWidth = 2, borderLeftColor = new Color(0.5f, 0.5f, 0.5f, 0.3f), paddingLeft = 8
-				}
-			};
-
-			void ApplyEditModeStyle(bool active)
-			{
-				subToolsGroup.style.opacity = active ? 1f : 0.4f;
-				GridUIHelpers.SetChildPickingMode(subToolsGroup, active ? PickingMode.Position : PickingMode.Ignore);
-			}
-
-			var editRow = new VisualElement { style = { flexDirection = FlexDirection.Row, alignItems = Align.Center, justifyContent = Justify.SpaceBetween, marginBottom = 8 } };
-			var editToggle = new Toggle("Edit Grid Lines") { value = GridSettings.IsEditModeActive, tooltip = "Turns on Editing Mode. This lets you add, move, or delete your custom grid lines right inside the Scene view." };
-			editToggle.RegisterValueChangedCallback(evt => { 
-				GridSettings.IsEditModeActive = evt.newValue; 
-				ApplyEditModeStyle(evt.newValue);
-				SceneView.RepaintAll(); 
-			});
-			editRow.Add(editToggle);
-			editRow.Add(new Label("Alt+E") { style = { fontSize = 10, unityFontStyleAndWeight = FontStyle.Italic, opacity = 0.6f } });
-			interactionGroup.Add(editRow);
-
-			var addLinesRow = new VisualElement { style = { flexDirection = FlexDirection.Row, justifyContent = Justify.SpaceBetween, marginBottom = 4 } };
-			var addLinesToggle = new Toggle("[Grid] Add Lines") { value = GridRenderer.IsAddLinesMode, tooltip = "Turn this on to click and drag new lines straight out of the center crosshair in your Scene view!" };
-			addLinesToggle.RegisterValueChangedCallback(evt => { GridRenderer.IsAddLinesMode = evt.newValue; SceneView.RepaintAll(); });
-			addLinesRow.Add(addLinesToggle);
-			subToolsGroup.Add(addLinesRow);
-
-			var mirrorRow = new VisualElement { style = { flexDirection = FlexDirection.Row, justifyContent = Justify.SpaceBetween, marginBottom = 4 } };
-			var mirrorToggle = new Toggle("[Grid] Mirror Mode") { value = GridSettings.IsMirrorModeActive, tooltip = "Turn this on to work symmetrically. When you pull a line to the right, a matching line will automatically appear on the left!" };
-			mirrorToggle.RegisterValueChangedCallback(evt => { GridSettings.IsMirrorModeActive = evt.newValue; SceneView.RepaintAll(); });
-			mirrorRow.Add(mirrorToggle);
-			mirrorRow.Add(new Label("Alt+M") { style = { fontSize = 10, unityFontStyleAndWeight = FontStyle.Italic, opacity = 0.6f } });
-			subToolsGroup.Add(mirrorRow);
-
-			var deleteRow = new VisualElement { style = { flexDirection = FlexDirection.Row, alignItems = Align.Center, justifyContent = Justify.SpaceBetween, marginBottom = 8 } };
-			var deleteBtn = new Button(GridRenderer.DeleteSelectedLines) { text = "Delete Selected", style = { height = 20, flexGrow = 1, marginRight = 8 } };
-			deleteRow.Add(deleteBtn);
-			deleteRow.Add(new Label("Alt+Bksp") { style = { fontSize = 10, unityFontStyleAndWeight = FontStyle.Italic, opacity = 0.6f } });
-			subToolsGroup.Add(deleteRow);
-
-			subToolsGroup.Add(new VisualElement { style = { height = 1, backgroundColor = new Color(0.5f, 0.5f, 0.5f, 0.2f), marginBottom = 8 } });
-
-			var snapToggleRow = new VisualElement { style = { flexDirection = FlexDirection.Row, justifyContent = Justify.SpaceBetween, marginBottom = 4 } };
-			var snapToggleObj = new Toggle("Snap Lines to UI") { value = GridSettings.SnapToElements, tooltip = "When you drag a grid line, it will magnetically snap to the edges of your UI elements, making it super easy to align things!" };
-			snapToggleObj.RegisterValueChangedCallback(evt => GridSettings.SaveSnapSettings(evt.newValue, GridSettings.SnapElementsToGrid, GridSettings.SnapDistance, GridSettings.ElementSnapDistance));
-			snapToggleRow.Add(snapToggleObj);
-			snapToggleRow.Add(new Label("Alt+S") { style = { fontSize = 10, unityFontStyleAndWeight = FontStyle.Italic, opacity = 0.6f } });
-			subToolsGroup.Add(snapToggleRow);
-
-			var snapDistField = GridUIHelpers.AddFloatFieldWithRef(subToolsGroup, "Line Snap Distance", "", GridSettings.SnapDistance, (val) => 
-				{ GridSettings.SaveSnapSettings(GridSettings.SnapToElements, GridSettings.SnapElementsToGrid, Mathf.Clamp(val, 0f, 100f), GridSettings.ElementSnapDistance); });
-			if (snapDistField != null) snapDistField.tooltip = "How close does your mouse need to get before the line snaps to the UI? 3 to 10 pixels is usually a good setting.";
-
-			ApplyEditModeStyle(GridSettings.IsEditModeActive);
-
-			interactionGroup.Add(subToolsGroup);
-
-			// Universal UI Snapping (Moved from its own foldout into Interaction)
-			interactionGroup.Add(new VisualElement { style = { height = 1, backgroundColor = new Color(0.5f, 0.5f, 0.5f, 0.2f), marginTop = 12, marginBottom = 8 } });
 			
 			var gridSnapToggleRow = new VisualElement { style = { flexDirection = FlexDirection.Row, justifyContent = Justify.SpaceBetween, marginBottom = 8 } };
 			var gridSnapToggleObj = new Toggle("Snap UI Elements to Grid") { value = GridSettings.SnapElementsToGrid, tooltip = "When you drag your UI elements around, they will magnetically snap to your grid lines!" };
@@ -203,9 +137,93 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 
 			interactionFoldout.Add(interactionGroup);
 
+			// =========================================================================
+			// 4. GRID EDITING (Mode-Specific Editing Tools)
+			// =========================================================================
+			var editingFoldout = new Foldout { text = "Grid Editing", value = !GridSettings.EditingCollapsed, style = { marginTop = 8 } };
+			editingFoldout.RegisterValueChangedCallback(evt => GridSettings.SaveCollapseState("Editing", !evt.newValue));
+			root.Add(editingFoldout);
+
+			var editingGroup = new VisualElement { style = { marginLeft = 15 } };
+			editingFoldout.Add(editingGroup);
+
+			if (GridSettings.CurrentMode == GridMode.UniformGrid)
+			{
+				if (GridSettings.CurrentSymmetryMode == SymmetryMode.FixedSpacing)
+					CreateFixedSpacingFields(editingGroup);
+				else
+					CreateStretchFields(editingGroup);
+			}
+			else if (GridSettings.CurrentMode == GridMode.CustomLines)
+			{
+				CreateDynamicFields(editingGroup);
+
+				editingGroup.Add(new VisualElement { style = { height = 1, backgroundColor = new Color(0.5f, 0.5f, 0.5f, 0.2f), marginTop = 8, marginBottom = 8 } });
+
+				var subToolsGroup = new VisualElement()
+				{
+					style =
+					{
+						marginLeft = 8, flexDirection = FlexDirection.Column,
+						borderLeftWidth = 2, borderLeftColor = new Color(0.5f, 0.5f, 0.5f, 0.3f), paddingLeft = 8
+					}
+				};
+
+				void ApplyEditModeStyle(bool active)
+				{
+					subToolsGroup.style.opacity = active ? 1f : 0.4f;
+					GridUIHelpers.SetChildPickingMode(subToolsGroup, active ? PickingMode.Position : PickingMode.Ignore);
+				}
+
+				var editRow = new VisualElement { style = { flexDirection = FlexDirection.Row, alignItems = Align.Center, justifyContent = Justify.SpaceBetween, marginBottom = 8 } };
+				var editToggle = new Toggle("Edit Grid Lines") { value = GridSettings.IsEditModeActive, tooltip = "Turns on Editing Mode. This lets you add, move, or delete your custom grid lines right inside the Scene view." };
+				editToggle.RegisterValueChangedCallback(evt => { 
+					GridSettings.IsEditModeActive = evt.newValue; 
+					ApplyEditModeStyle(evt.newValue);
+					SceneView.RepaintAll(); 
+				});
+				editRow.Add(editToggle);
+				editRow.Add(new Label("Alt+E") { style = { fontSize = 10, unityFontStyleAndWeight = FontStyle.Italic, opacity = 0.6f } });
+				editingGroup.Add(editRow);
+
+				var addLinesRow = new VisualElement { style = { flexDirection = FlexDirection.Row, justifyContent = Justify.SpaceBetween, marginBottom = 4 } };
+				var addLinesToggle = new Toggle("[Grid] Add Lines") { value = GridRenderer.IsAddLinesMode, tooltip = "Turn this on to click and drag new lines straight out of the center crosshair in your Scene view!" };
+				addLinesToggle.RegisterValueChangedCallback(evt => { GridRenderer.IsAddLinesMode = evt.newValue; SceneView.RepaintAll(); });
+				addLinesRow.Add(addLinesToggle);
+				subToolsGroup.Add(addLinesRow);
+
+				var mirrorRow = new VisualElement { style = { flexDirection = FlexDirection.Row, justifyContent = Justify.SpaceBetween, marginBottom = 4 } };
+				var mirrorToggle = new Toggle("[Grid] Mirror Mode") { value = GridSettings.IsMirrorModeActive, tooltip = "Turn this on to work symmetrically. When you pull a line to the right, a matching line will automatically appear on the left!" };
+				mirrorToggle.RegisterValueChangedCallback(evt => { GridSettings.IsMirrorModeActive = evt.newValue; SceneView.RepaintAll(); });
+				mirrorRow.Add(mirrorToggle);
+				mirrorRow.Add(new Label("Alt+M") { style = { fontSize = 10, unityFontStyleAndWeight = FontStyle.Italic, opacity = 0.6f } });
+				subToolsGroup.Add(mirrorRow);
+
+				var deleteRow = new VisualElement { style = { flexDirection = FlexDirection.Row, alignItems = Align.Center, justifyContent = Justify.SpaceBetween, marginBottom = 8 } };
+				var deleteBtn = new Button(GridRenderer.DeleteSelectedLines) { text = "Delete Selected", style = { height = 20, flexGrow = 1, marginRight = 8 } };
+				deleteRow.Add(deleteBtn);
+				deleteRow.Add(new Label("Alt+Bksp") { style = { fontSize = 10, unityFontStyleAndWeight = FontStyle.Italic, opacity = 0.6f } });
+				subToolsGroup.Add(deleteRow);
+
+				subToolsGroup.Add(new VisualElement { style = { height = 1, backgroundColor = new Color(0.5f, 0.5f, 0.5f, 0.2f), marginBottom = 8 } });
+
+				var snapToggleRow = new VisualElement { style = { flexDirection = FlexDirection.Row, justifyContent = Justify.SpaceBetween, marginBottom = 4 } };
+				var snapToggleObj = new Toggle("Snap Lines to UI") { value = GridSettings.SnapToElements, tooltip = "When you drag a grid line, it will magnetically snap to the edges of your UI elements, making it super easy to align things!" };
+				snapToggleObj.RegisterValueChangedCallback(evt => GridSettings.SaveSnapSettings(evt.newValue, GridSettings.SnapElementsToGrid, GridSettings.SnapDistance, GridSettings.ElementSnapDistance));
+				snapToggleRow.Add(snapToggleObj);
+				snapToggleRow.Add(new Label("Alt+S") { style = { fontSize = 10, unityFontStyleAndWeight = FontStyle.Italic, opacity = 0.6f } });
+				subToolsGroup.Add(snapToggleRow);
+
+				var snapDistField = GridUIHelpers.AddFloatFieldWithRef(subToolsGroup, "Line Snap Distance", "", GridSettings.SnapDistance, (val) => 
+					{ GridSettings.SaveSnapSettings(GridSettings.SnapToElements, GridSettings.SnapElementsToGrid, Mathf.Clamp(val, 0f, 100f), GridSettings.ElementSnapDistance); });
+				if (snapDistField != null) snapDistField.tooltip = "How close does your mouse need to get before the line snaps to the UI? 3 to 10 pixels is usually a good setting.";
+
+				ApplyEditModeStyle(GridSettings.IsEditModeActive);
+				editingGroup.Add(subToolsGroup);
+			}
 
 			// =========================================================================
-			// 4. VISUALS & APPEARANCE (The Look)
+			// 5. VISUALS & APPEARANCE (The Look)
 			// =========================================================================
 			var visualsFoldout = new Foldout { text = "Visuals & Appearance", value = !GridSettings.VisualsCollapsed, style = { marginTop = 8 } };
 			visualsFoldout.RegisterValueChangedCallback(evt => GridSettings.SaveCollapseState("Visuals", !evt.newValue));
@@ -286,11 +304,7 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 			modeDropdown.RegisterValueChangedCallback(evt =>
 			{
 				GridSettings.SaveMode((GridMode)evt.newValue);
-				if (_layoutCardSlot != null)
-				{
-					_layoutCardSlot.Clear();
-					_layoutCardSlot.Add(CreateGridLayoutCard());
-				}
+				CreateGUI();
 				SceneView.RepaintAll();
 			});
 			mainModeRow.Add(modeDropdown);
@@ -317,39 +331,24 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 			mainModeRow.Add(modeHelpBtn);
 			layoutContent.Add(mainModeRow);
 
-			layoutContent.Add(new VisualElement { style = { height = 1, backgroundColor = new Color(0.5f, 0.5f, 0.5f, 0.2f), marginBottom = 6 } });
+			// Grid Type Row (For both modes)
+			var gridTypeRow = new VisualElement { style = { flexDirection = FlexDirection.Row, alignItems = Align.Center, justifyContent = Justify.SpaceBetween, marginBottom = 4 } };
+			gridTypeRow.Add(new Label("Grid Type"));
 
-			// Sub-options
 			if (GridSettings.CurrentMode == GridMode.UniformGrid)
 			{
-				var symModeRow = new VisualElement { style = { flexDirection = FlexDirection.Row, alignItems = Align.Center, justifyContent = Justify.SpaceBetween, marginBottom = 8 } };
-				symModeRow.Add(new Label("Grid Type"));
 				var symDropdown = new EnumField(GridSettings.CurrentSymmetryMode) { style = { flexGrow = 1, marginLeft = 10 } };
 				symDropdown.tooltip = "Fixed Spacing uses exact pixels for gaps. Stretch With Canvas uses percentages so it stretches when the screen size changes.";
 				symDropdown.RegisterValueChangedCallback(evt =>
 				{
 					GridSettings.SaveSymmetryMode((SymmetryMode)evt.newValue);
-					if (_layoutCardSlot != null)
-					{
-						_layoutCardSlot.Clear();
-						_layoutCardSlot.Add(CreateGridLayoutCard());
-					}
+					CreateGUI();
 					SceneView.RepaintAll();
 				});
-				symModeRow.Add(symDropdown);
-				layoutContent.Add(symModeRow);
-
-				layoutContent.Add(new VisualElement { style = { height = 1, backgroundColor = new Color(0.5f, 0.5f, 0.5f, 0.2f), marginBottom = 6 } });
-
-				if (GridSettings.CurrentSymmetryMode == SymmetryMode.FixedSpacing)
-					CreateFixedSpacingFields(layoutContent);
-				else
-					CreateStretchFields(layoutContent);
+				gridTypeRow.Add(symDropdown);
 			}
-			else if (GridSettings.CurrentMode == GridMode.CustomLines)
+			else
 			{
-				var dynModeRow = new VisualElement { style = { flexDirection = FlexDirection.Row, alignItems = Align.Center, justifyContent = Justify.SpaceBetween, marginBottom = 8 } };
-				dynModeRow.Add(new Label("Line Behavior"));
 				var dynDropdown = new EnumField(GridSettings.CurrentDynamicType) { style = { flexGrow = 1, marginLeft = 10 } };
 				dynDropdown.tooltip = "Fixed Position locks lines to exact pixels. Stretch With Canvas lets them slide gracefully when the screen resizes.";
 				dynDropdown.RegisterValueChangedCallback(evt =>
@@ -376,20 +375,12 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 						Vector2 dims = GridRenderer.GetCanvasSize();
 						GridSettings.SaveDynamicType(newType, dims.x, dims.y);
 					}
-					if (_layoutCardSlot != null)
-					{
-						_layoutCardSlot.Clear();
-						_layoutCardSlot.Add(CreateGridLayoutCard());
-					}
+					CreateGUI();
 					SceneView.RepaintAll();
 				});
-				dynModeRow.Add(dynDropdown);
-				layoutContent.Add(dynModeRow);
-
-				layoutContent.Add(new VisualElement { style = { height = 1, backgroundColor = new Color(0.5f, 0.5f, 0.5f, 0.2f), marginBottom = 6 } });
-
-				CreateDynamicFields(layoutContent);
+				gridTypeRow.Add(dynDropdown);
 			}
+			layoutContent.Add(gridTypeRow);
 
 			return layoutFoldout;
 		}

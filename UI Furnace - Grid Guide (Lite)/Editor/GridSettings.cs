@@ -60,6 +60,7 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 		// ─── UI Collapse State ─────────────────────────────────────────────────
 		public static bool MainSettingsCollapsed { get; set; } = false;
 		public static bool InteractionCollapsed  { get; set; } = false;
+		public static bool EditingCollapsed      { get; set; } = false;
 		public static bool VisualsCollapsed      { get; set; } = false;
 
 		// ─── Debounce state  ────────────────────────────────────────────────────
@@ -120,6 +121,7 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 
 			MainSettingsCollapsed = a.LayoutCollapsed;
 			InteractionCollapsed  = a.SnappingCollapsed;
+			EditingCollapsed      = a.EditingCollapsed;
 			VisualsCollapsed      = a.ColorsCollapsed;
 		}
 
@@ -136,6 +138,12 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 		{
 			RecordUndo("Change Grid Mode");
 			CurrentMode = mode;
+			if (mode == GridMode.UniformGrid)
+			{
+				IsEditModeActive = false;
+				IsMirrorModeActive = false;
+				GridRenderer.IsAddLinesMode = false;
+			}
 			var a = GridSettingsAsset.instance; a.GridModeIndex = (int)mode; a.SaveToDisk();
 		}
 
@@ -261,7 +269,8 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 			{
 				case "MainSettings": MainSettingsCollapsed = collapsed; a.LayoutCollapsed = collapsed; break;
 				case "Interaction":  InteractionCollapsed  = collapsed; a.SnappingCollapsed = collapsed; break;
-				case "Visuals":      VisualsCollapsed      = collapsed; a.ColorsCollapsed = collapsed; break;
+				case "Editing":      EditingCollapsed      = collapsed; a.EditingCollapsed  = collapsed; break;
+				case "Visuals":      VisualsCollapsed      = collapsed; a.ColorsCollapsed   = collapsed; break;
 			}
 			a.SaveToDisk();
 		}

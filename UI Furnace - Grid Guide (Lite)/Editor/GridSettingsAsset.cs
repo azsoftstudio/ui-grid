@@ -41,6 +41,7 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 		// Card collapse states
 		[SerializeField] internal bool LayoutCollapsed     = false;
 		[SerializeField] internal bool SnappingCollapsed   = false; // expanded by default — it's a core feature
+		[SerializeField] internal bool EditingCollapsed    = false;
 		[SerializeField] internal bool ColorsCollapsed     = false;
 
 		/// <summary>Write the asset to disk (UserSettings/ folder).</summary>

@@ -65,6 +65,16 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 			};
 			rootVisualElement.Add(root);
 
+			bool isCustomMode = GridSettings.CurrentMode == GridMode.CustomLines;
+			if (!isCustomMode)
+			{
+				var warnBox = new IMGUIContainer(() =>
+				{
+					EditorGUILayout.HelpBox("Grid Mode is currently set to Uniform Grid. Switch Grid Mode to Custom Lines in Grid Manager to generate and edit custom lines.", MessageType.Info);
+				});
+				root.Add(warnBox);
+			}
+
 			root.Add(new Label("Automatically generate a bunch of lines at once instead of clicking them in one by one.")
 			{
 				style = { whiteSpace = WhiteSpace.Normal, opacity = 0.7f, fontSize = 11, marginBottom = 12 }
@@ -134,6 +144,9 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 			btnContainer.Add(btnAdd);
 			btnContainer.Add(clearRow);
 			root.Add(btnContainer);
+
+			card.SetEnabled(isCustomMode);
+			btnContainer.SetEnabled(isCustomMode);
 		}
 
 		private void GenerateLines()
