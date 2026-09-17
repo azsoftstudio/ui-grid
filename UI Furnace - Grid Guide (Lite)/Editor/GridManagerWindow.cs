@@ -26,6 +26,11 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 			_window.titleContent = new GUIContent("Grid Manager", icon?.image);
 		}
 
+		private void OnEnable()
+		{
+			_window = this;
+		}
+
 		private void OnDestroy()
 		{
 			if (_window == this) _window = null;

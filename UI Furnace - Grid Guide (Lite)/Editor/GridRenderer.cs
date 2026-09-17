@@ -740,6 +740,7 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 			s_SnapHighlightedRects.Clear();
 			s_HighlightOffsetsX.Clear();
 			s_HighlightOffsetsY.Clear();
+			s_PendingBadgeText = null;
 
 			if (!GridSettings.ShowGrid) return;
 
@@ -803,6 +804,9 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 					}
 				}
 
+				// Draw position badge on top of all grid lines, axes, and snap highlights
+				DrawPendingPositionBadge();
+
 				// #7 — Scene View HUD: movable GUI window over the scene
 				if (GridSettings.CurrentMode == GridMode.CustomLines && GridSettings.IsEditModeActive)
 					DrawEditModeHUD();
@@ -819,53 +823,28 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 		/// Rebind via Edit â†’ Shortcuts â†’ "UI Furnace/Toggle Grid".
 		/// </summary>
 		[Shortcut("UI Furnace/Toggle Grid", KeyCode.G, ShortcutModifiers.Alt)]
-		private static void ToggleGridShortcut()
-		{
-			GridSettings.SaveVisibility(!GridSettings.ShowGrid);
-			SceneView.RepaintAll();
-		}
+		private static void ToggleGridShortcut() => ToggleGrid();
 
 		[Shortcut("UI Furnace/Toggle Edit Mode", KeyCode.E, ShortcutModifiers.Alt)]
-		private static void ToggleEditModeShortcut()
-		{
-			if (GridSettings.CurrentMode == GridMode.CustomLines)
-			{
-				GridSettings.IsEditModeActive = !GridSettings.IsEditModeActive;
-				SceneView.RepaintAll();
-				GridManagerWindow.Instance?.CreateGUI();
-			}
-		}
+		private static void ToggleEditModeShortcut() => ToggleEditMode();
 
-		[Shortcut("UI Furnace/Toggle Snap to Elements", KeyCode.S, ShortcutModifiers.Alt)]
-		private static void ToggleSnapShortcut()
-		{
-			if (GridSettings.CurrentMode == GridMode.CustomLines && GridSettings.IsEditModeActive)
-			{
-				GridSettings.SaveSnapSettings(!GridSettings.SnapToElements, GridSettings.SnapElementsToGrid, GridSettings.SnapDistance, GridSettings.ElementSnapDistance);
-				SceneView.RepaintAll();
-				GridManagerWindow.Instance?.CreateGUI();
-			}
-		}
+		[Shortcut("UI Furnace/Toggle Snap Lines to UI", KeyCode.S, ShortcutModifiers.Alt)]
+		private static void ToggleSnapLinesToUIShortcut() => ToggleSnapLinesToUI();
 
-		// #8 â€” Mirror Mode shortcut
 		[Shortcut("UI Furnace/Toggle Mirror Mode", KeyCode.M, ShortcutModifiers.Alt)]
-		private static void ToggleMirrorModeShortcut()
-		{
-			if (GridSettings.CurrentMode == GridMode.CustomLines && GridSettings.IsEditModeActive)
-			{
-				GridSettings.IsMirrorModeActive = !GridSettings.IsMirrorModeActive;
-				SceneView.RepaintAll();
-				GridManagerWindow.Instance?.CreateGUI();
-			}
-		}
+		private static void ToggleMirrorModeShortcut() => ToggleMirrorMode();
 
-		[Shortcut("UI Furnace/Toggle Universal Snapping", KeyCode.S, ShortcutModifiers.Alt | ShortcutModifiers.Shift)]
-		private static void ToggleUniversalSnapShortcut()
-		{
-			GridSettings.SaveSnapSettings(GridSettings.SnapToElements, !GridSettings.SnapElementsToGrid, GridSettings.SnapDistance, GridSettings.ElementSnapDistance);
-			SceneView.RepaintAll();
-			GridManagerWindow.Instance?.CreateGUI();
-		}
+		[Shortcut("UI Furnace/Toggle Snap Elements to Grid", KeyCode.S, ShortcutModifiers.Alt | ShortcutModifiers.Shift)]
+		private static void ToggleSnapElementsToGridShortcut() => ToggleSnapElementsToGrid();
+
+		[Shortcut("UI Furnace/Delete Selected Lines", KeyCode.Backspace, ShortcutModifiers.Alt)]
+		private static void DeleteSelectedLinesShortcut() => DeleteSelectedLines();
+
+		[Shortcut("UI Furnace/Add Horizontal Line", KeyCode.H, ShortcutModifiers.Alt)]
+		private static void AddHorizontalLineShortcut() => StartAddingHorizontalLine();
+
+		[Shortcut("UI Furnace/Add Vertical Line", KeyCode.V, ShortcutModifiers.Alt)]
+		private static void AddVerticalLineShortcut() => StartAddingVerticalLine();
 
 		// â”€â”€â”€ Drawing â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 		/// <summary>Apply global opacity (Suggestion 6) to a color.</summary>
@@ -1426,12 +1405,11 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 							DrawCrispLine(GridSettings.GridThickness, mirrorPos - up * halfHeight, mirrorPos + up * halfHeight);
 							Handles.color = dragColor;
 						}
-						// #10 â€” Offset label. t = snappedProj / canvasWidth, ranges [-0.5, 0.5]
+						// #10 — Offset label. t = snappedProj / canvasWidth, ranges [-0.5, 0.5]
 						float pxOffX = GridSettings.CurrentDynamicType == DynamicGridType.FixedPosition
 							? snappedProj / (localWidth > 0.001f ? canvasWidth / localWidth : 1f)
 							: t * localWidth;
-						Handles.Label(mouseWorldPos + labelOffset,
-							$"X: {(pxOffX >= 0 ? "+" : "")}{pxOffX:F0} px");
+						DrawPositionBadge(mouseWorldPos, $"X: {(pxOffX >= 0 ? "+" : "")}{pxOffX:F0} px");
 					}
 					else
 					{
@@ -1440,7 +1418,7 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 						float t = snappedProj / canvasHeight;
 						Vector3 lockedPos = center + up * (t * canvasHeight);
 						DrawCrispLine(GridSettings.GridThickness, lockedPos - right * halfWidth, lockedPos + right * halfWidth);
-						// #8 â€” Ghost mirror preview
+						// #8 — Ghost mirror preview
 						if (GridSettings.IsMirrorModeActive)
 						{
 							Color ghost = dragColor; ghost.a *= 0.4f;
@@ -1449,12 +1427,11 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 							DrawCrispLine(GridSettings.GridThickness, mirrorPos - right * halfWidth, mirrorPos + right * halfWidth);
 							Handles.color = dragColor;
 						}
-						// #10 â€” Offset label. t = snappedProj / canvasHeight, ranges [-0.5, 0.5]
+						// #10 — Offset label. t = snappedProj / canvasHeight, ranges [-0.5, 0.5]
 						float pxOffY = GridSettings.CurrentDynamicType == DynamicGridType.FixedPosition
 							? snappedProj / (localHeight > 0.001f ? canvasHeight / localHeight : 1f)
 							: t * localHeight;
-						Handles.Label(mouseWorldPos + labelOffset,
-							$"Y: {(pxOffY >= 0 ? "+" : "")}{pxOffY:F0} px");
+						DrawPositionBadge(mouseWorldPos, $"Y: {(pxOffY >= 0 ? "+" : "")}{pxOffY:F0} px");
 					}
 
 					// Snap highlight is drawn after DrawDynamicGrid in OnSceneGUI to ensure it's always on top.
@@ -1593,8 +1570,7 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 						float pxX = GridSettings.CurrentDynamicType == DynamicGridType.FixedPosition
 							? snappedProj / (localWidth > 0.001f ? canvasWidth / localWidth : 1f)
 							: (snappedProj / canvasWidth) * (s_CachedCanvasRect != null ? s_CachedCanvasRect.rect.width : localWidth);
-						Handles.Label(mouseWorldPos + labelOffset,
-							$"X: {(pxX >= 0 ? "+" : "")}{pxX:F0} px");
+						DrawPositionBadge(mouseWorldPos, $"X: {(pxX >= 0 ? "+" : "")}{pxX:F0} px");
 					}
 					else
 					{
@@ -1602,7 +1578,7 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 						float snappedProj = ApplySnap(rawProj, s_SnapWorldLinesY, s_SnapSourcesY);
 						Vector3 lockedPos = center + up * snappedProj;
 						DrawCrispLine(GridSettings.GridThickness, lockedPos - right * halfWidth, lockedPos + right * halfWidth);
-						// #8 â€” Ghost mirror preview for axis drag
+						// #8 — Ghost mirror preview for axis drag
 						if (GridSettings.IsMirrorModeActive)
 						{
 							Color ghost = dragColor; ghost.a *= 0.4f;
@@ -1614,8 +1590,7 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 						float pxY = GridSettings.CurrentDynamicType == DynamicGridType.FixedPosition
 							? snappedProj / (localHeight > 0.001f ? canvasHeight / localHeight : 1f)
 							: (snappedProj / canvasHeight) * (s_CachedCanvasRect != null ? s_CachedCanvasRect.rect.height : localHeight);
-						Handles.Label(mouseWorldPos + labelOffset,
-							$"Y: {(pxY >= 0 ? "+" : "")}{pxY:F0} px");
+						DrawPositionBadge(mouseWorldPos, $"Y: {(pxY >= 0 ? "+" : "")}{pxY:F0} px");
 					}
 				}
 
@@ -1960,8 +1935,104 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 			}
 		}
 
+		private static GUIStyle s_PositionBadgeStyle;
+		private static GUIStyle PositionBadgeStyle
+		{
+			get
+			{
+				if (s_PositionBadgeStyle == null)
+				{
+					s_PositionBadgeStyle = new GUIStyle(EditorStyles.boldLabel)
+					{
+						fontSize = 11,
+						alignment = TextAnchor.MiddleCenter,
+						normal = { textColor = Color.white }
+					};
+				}
+				return s_PositionBadgeStyle;
+			}
+		}
+
+		private static void DrawBadgeBorder(Rect r, float thickness, Color color)
+		{
+			EditorGUI.DrawRect(new Rect(r.x, r.y, r.width, thickness), color);
+			EditorGUI.DrawRect(new Rect(r.x, r.yMax - thickness, r.width, thickness), color);
+			EditorGUI.DrawRect(new Rect(r.x, r.y, thickness, r.height), color);
+			EditorGUI.DrawRect(new Rect(r.xMax - thickness, r.y, thickness, r.height), color);
+		}
+
+		private static string s_PendingBadgeText = null;
+		private static Vector3 s_PendingBadgePos;
+
+		private static void DrawPositionBadge(Vector3 worldPos, string text)
+		{
+			s_PendingBadgePos = worldPos;
+			s_PendingBadgeText = text;
+		}
+
+		private static void DrawPendingPositionBadge()
+		{
+			if (string.IsNullOrEmpty(s_PendingBadgeText)) return;
+
+			if (Camera.current != null && !Camera.current.orthographic)
+			{
+				if (Vector3.Dot(Camera.current.transform.forward, s_PendingBadgePos - Camera.current.transform.position) <= 0f)
+				{
+					s_PendingBadgeText = null;
+					return;
+				}
+			}
+
+			Vector2 screenPos = HandleUtility.WorldToGUIPoint(s_PendingBadgePos);
+
+			Handles.BeginGUI();
+			GUIContent content = new GUIContent(s_PendingBadgeText);
+			Vector2 size = PositionBadgeStyle.CalcSize(content);
+
+			float padX = 7f;
+			float padY = 3f;
+			float badgeWidth = size.x + padX * 2f;
+			float badgeHeight = size.y + padY * 2f;
+
+			// Position badge above and to the right of the line/cursor
+			float targetX = screenPos.x + 12f;
+			float targetY = screenPos.y - badgeHeight - 6f;
+
+			if (SceneView.currentDrawingSceneView != null)
+			{
+				Rect svRect = SceneView.currentDrawingSceneView.position;
+				// Flip below if too close to top edge
+				if (targetY < 4f)
+					targetY = screenPos.y + 14f;
+				// Flip left if too close to right edge
+				if (targetX + badgeWidth > svRect.width - 4f)
+					targetX = screenPos.x - badgeWidth - 12f;
+
+				targetX = Mathf.Clamp(targetX, 4f, svRect.width - badgeWidth - 4f);
+				targetY = Mathf.Clamp(targetY, 4f, svRect.height - badgeHeight - 4f);
+			}
+
+			Rect badgeRect = new Rect(targetX, targetY, badgeWidth, badgeHeight);
+
+			// 1. Subtle drop shadow for depth on bright/white backgrounds
+			Rect shadowRect = new Rect(badgeRect.x + 1f, badgeRect.y + 1f, badgeRect.width, badgeRect.height);
+			EditorGUI.DrawRect(shadowRect, new Color(0f, 0f, 0f, 0.45f));
+
+			// 2. Solid dark pill background — guaranteed high contrast on white backgrounds
+			EditorGUI.DrawRect(badgeRect, new Color(0.12f, 0.12f, 0.14f, 0.94f));
+
+			// 3. Crisp border — ensures visibility against dark backgrounds
+			DrawBadgeBorder(badgeRect, 1f, new Color(0.45f, 0.45f, 0.5f, 0.7f));
+
+			// 4. Sharp, legible white text
+			GUI.Label(badgeRect, content, PositionBadgeStyle);
+
+			Handles.EndGUI();
+			s_PendingBadgeText = null;
+		}
+
 		/// <summary>
-		/// #10 â€” Draw an offset label next to the hovered/dragged line so the user
+		/// #10 — Draw an offset label next to the hovered/dragged line so the user
 		/// always knows its exact pixel position from center.
 		/// </summary>
 		private static void DrawLineOffsetLabel(Vector3 mouseWorldPos,
@@ -1972,11 +2043,7 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 				: (rawOffset - 0.5f) * localSize;   // stretch t -> pixels from center
 			string sign = px >= 0 ? "+" : "";
 
-			Vector3 offset = Vector3.zero;
-			if (Camera.current != null)
-				offset = (Camera.current.transform.right - Camera.current.transform.up) * HandleUtility.GetHandleSize(mouseWorldPos) * 0.2f;
-
-			Handles.Label(mouseWorldPos + offset, $"{axis}: {sign}{px:F0} px");
+			DrawPositionBadge(mouseWorldPos, $"{axis}: {sign}{px:F0} px");
 		}
 
 		/// <summary>Draw dynamically placed editable lines.</summary>
@@ -2243,8 +2310,44 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 
 
 
+		// ─── Menu Items & Commands ─────────────────────────────────────────────
+		[MenuItem("Tools/UI Furnace/Toggle Grid &g", false, 1)]
+		public static void ToggleGrid()
+		{
+			GridSettings.SaveVisibility(!GridSettings.ShowGrid);
+			SceneView.RepaintAll();
+			RefreshOpenWindows();
+		}
+
+		[MenuItem("Tools/UI Furnace/Toggle Snap Elements to Grid &#s", false, 2)]
+		public static void ToggleSnapElementsToGrid()
+		{
+			GridSettings.SaveSnapSettings(GridSettings.SnapToElements, !GridSettings.SnapElementsToGrid, GridSettings.SnapDistance, GridSettings.ElementSnapDistance);
+			SceneView.RepaintAll();
+			RefreshOpenWindows();
+		}
+
+		[MenuItem("Tools/UI Furnace/[Grid] Toggle Edit Mode &e", false, 10)]
+		public static void ToggleEditMode()
+		{
+			if (GridSettings.CurrentMode != GridMode.CustomLines) return;
+			if (GridSettings.IsEditModeActive)
+			{
+				ExitEditMode();
+			}
+			else
+			{
+				GridSettings.IsEditModeActive = true;
+				SceneView.RepaintAll();
+				RefreshOpenWindows();
+			}
+		}
+
+		[MenuItem("Tools/UI Furnace/[Grid] Toggle Edit Mode &e", true, 10)]
+		private static bool ValidateToggleEditMode() => GridSettings.CurrentMode == GridMode.CustomLines;
+
 		[MenuItem("Tools/UI Furnace/[Grid] Add Horizontal Line &h", false, 11)]
-		private static void StartAddingHorizontalLine()
+		public static void StartAddingHorizontalLine()
 		{
 			if (GridSettings.CurrentMode != GridMode.CustomLines || !GridSettings.IsEditModeActive) return;
 			s_IsAddingLine = true;
@@ -2267,7 +2370,7 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 		private static bool ValidateAddHorizontalLine() => GridSettings.CurrentMode == GridMode.CustomLines && GridSettings.IsEditModeActive;
 
 		[MenuItem("Tools/UI Furnace/[Grid] Add Vertical Line &v", false, 12)]
-		private static void StartAddingVerticalLine()
+		public static void StartAddingVerticalLine()
 		{
 			if (GridSettings.CurrentMode != GridMode.CustomLines || !GridSettings.IsEditModeActive) return;
 			s_IsAddingLine = true;
@@ -2346,6 +2449,7 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 				SelectedIndicesY.Clear();
 				s_HoverIndexX = -1;
 				s_HoverIndexY = -1;
+				RefreshOpenWindows();
 				if (SceneView.lastActiveSceneView != null) SceneView.lastActiveSceneView.Repaint();
 			}
 		}
@@ -2355,17 +2459,35 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 
 		// #8 — Mirror Mode menu item (so it also appears in Tools > UI Furnace)
 		[MenuItem("Tools/UI Furnace/[Grid] Toggle Mirror Mode &m", false, 14)]
-		private static void ToggleMirrorModeMenuItem()
+		public static void ToggleMirrorMode()
 		{
 			if (GridSettings.CurrentMode != GridMode.CustomLines || !GridSettings.IsEditModeActive) return;
 			GridSettings.IsMirrorModeActive = !GridSettings.IsMirrorModeActive;
 			SceneView.RepaintAll();
-			foreach (var win in Resources.FindObjectsOfTypeAll<GridManagerWindow>()) win.CreateGUI();
+			RefreshOpenWindows();
 		}
 
 		[MenuItem("Tools/UI Furnace/[Grid] Toggle Mirror Mode &m", true, 14)]
 		private static bool ValidateToggleMirrorMode() => GridSettings.CurrentMode == GridMode.CustomLines && GridSettings.IsEditModeActive;
-		
+
+		[MenuItem("Tools/UI Furnace/[Grid] Toggle Snap Lines to UI &s", false, 15)]
+		public static void ToggleSnapLinesToUI()
+		{
+			if (GridSettings.CurrentMode != GridMode.CustomLines || !GridSettings.IsEditModeActive) return;
+			GridSettings.SaveSnapSettings(!GridSettings.SnapToElements, GridSettings.SnapElementsToGrid, GridSettings.SnapDistance, GridSettings.ElementSnapDistance);
+			SceneView.RepaintAll();
+			RefreshOpenWindows();
+		}
+
+		[MenuItem("Tools/UI Furnace/[Grid] Toggle Snap Lines to UI &s", true, 15)]
+		private static bool ValidateToggleSnapLinesToUI() => GridSettings.CurrentMode == GridMode.CustomLines && GridSettings.IsEditModeActive;
+
+		private static void RefreshOpenWindows()
+		{
+			foreach (var win in Resources.FindObjectsOfTypeAll<GridManagerWindow>())
+				win.CreateGUI();
+		}
+
 		private static void ExitEditMode()
 		{
 			GridSettings.IsEditModeActive   = false;
@@ -2381,8 +2503,7 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 			
 			// Force Repaint for all SceneViews and Manager Windows so the toggle switch visually turns off
 			SceneView.RepaintAll();
-			foreach (var win in Resources.FindObjectsOfTypeAll<GridManagerWindow>())
-				win.Repaint();
+			RefreshOpenWindows();
 		}
 	}
 }
