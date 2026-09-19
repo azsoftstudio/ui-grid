@@ -93,10 +93,29 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 			SceneView.duringSceneGui  += OnSceneGUI;
 			EditorApplication.update -= OnEditorUpdate;
 			EditorApplication.update += OnEditorUpdate;
-			Selection.selectionChanged -= InvalidateCache;
-			Selection.selectionChanged += InvalidateCache;
+			Selection.selectionChanged -= OnSelectionChanged;
+			Selection.selectionChanged += OnSelectionChanged;
 			EditorApplication.hierarchyChanged += () => s_SnapHierarchyIsDirty = true;
-			GridSettings.LoadFromAsset();
+			GridSettings.LoadCurrentSettings();
+		}
+
+		private static void OnSelectionChanged()
+		{
+			InvalidateCache();
+
+			var activeGO = Selection.activeGameObject;
+			if (activeGO != null)
+			{
+				var rt = activeGO.GetComponent<RectTransform>();
+				if (rt != null)
+				{
+					var can = rt.GetComponentInParent<Canvas>();
+					if (can != null && can.renderMode != RenderMode.WorldSpace)
+					{
+						GridSettings.SyncCanvasSelection(can);
+					}
+				}
+			}
 		}
 
 		private static void OnEditorUpdate()
@@ -146,6 +165,7 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 		private static void ProcessElementSnapping()
 		{
 			if (!GridSettings.SnapElementsToGrid) return;
+			if (GridSettings.ActiveProfile == null) return;
 			if (Tools.current != Tool.Rect) return;
 			
 			var validRTs = new List<RectTransform>();
@@ -491,6 +511,11 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 			s_CachedRenderMode    = can.renderMode;
 			s_CachedInstanceID    = activeGO.GetInstanceID();
 
+			if (GridSettings.ActiveCanvas != can)
+			{
+				GridSettings.SyncCanvasSelection(can);
+			}
+
 			rectTransform = rt; canvas = can; canvasRect = crt;
 			return true;
 		}
@@ -750,6 +775,13 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 
 			if (!TryGetCachedComponents(out RectTransform rectTransform, out Canvas canvas, out RectTransform canvasRect))
 				return;
+
+			if (GridSettings.ActiveProfile == null)
+			{
+				s_ActiveWorldGridLinesX.Clear();
+				s_ActiveWorldGridLinesY.Clear();
+				return;
+			}
 
 			canvasRect.GetWorldCorners(s_CornersCache);
 			Vector3 BL = s_CornersCache[0], TL = s_CornersCache[1], TR = s_CornersCache[2], BR = s_CornersCache[3];

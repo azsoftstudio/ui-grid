@@ -5,24 +5,19 @@ using System.Collections.Generic;
 
 namespace AZSoftStudio.UIFurnace.GridGuide
 {
-	/// <summary>Sub-modes for Symmetry grid.</summary>
-	public enum SymmetryMode { FixedSpacing, StretchWithCanvas }
-
-	/// <summary>Sub-modes for Dynamic grid.</summary>
-	public enum DynamicGridType { FixedPosition, StretchWithCanvas }
-
-	/// <summary>Top-level grid mode.</summary>
-	public enum GridMode { UniformGrid, CustomLines }
-
 	/// <summary>
-	/// Manages grid settings. Persists via ScriptableSingleton (UserSettings/).
-	/// All immediate Save* calls register with Unity's Undo system.
-	/// Queue* variants are debounced for drag operations (no Undo per frame).
+	/// Manages grid settings. Connects the active Canvas's GridProfile with live editor state.
+	/// Supports Undo/Redo and persists profile assets to disk.
 	/// </summary>
 	public static class GridSettings
 	{
 		private const float SaveDelaySeconds = 0.3f;
 		public const string Version = "1.0.0";
+
+		// ─── Active Canvas & Profile State ─────────────────────────────────────
+		public static Canvas ActiveCanvas { get; set; }
+		public static GridCanvasLink ActiveLink => ActiveCanvas != null ? ActiveCanvas.GetComponent<GridCanvasLink>() : null;
+		public static GridProfile ActiveProfile { get; set; }
 
 		// ─── Runtime cache (read every frame by GridRenderer) ──────────────────
 		public static Color         GridColor           { get; set; } = new Color(0.3f, 0.7f, 1f,   0.25f);
@@ -43,6 +38,8 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 
 		public static float AxisThickness { get; set; } = 3f;
 		public static float GridThickness { get; set; } = 1f;
+		
+		// ShowGrid is outside of the profile — it is an editor-wide view toggle
 		public static bool  ShowGrid      { get; set; } = true;
 		public static float GridOpacity   { get; set; } = 1f;
 
@@ -57,7 +54,7 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 		/// <summary>When true, placing or dragging a line also places its mirror on the opposite side.</summary>
 		public static bool IsMirrorModeActive { get; set; } = false;
 
-		// ─── UI Collapse State ─────────────────────────────────────────────────
+		// ─── UI Collapse State (Editor-side) ───────────────────────────────────
 		public static bool MainSettingsCollapsed { get; set; } = false;
 		public static bool InteractionCollapsed  { get; set; } = false;
 		public static bool EditingCollapsed      { get; set; } = false;
@@ -76,60 +73,248 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 
 		private static void OnUndoRedo()
 		{
-			// Load from asset explicitly so the static RAM properties (used by SceneView)
-			// reflect the Undone/Redone values instead of staying stuck.
-			LoadFromAsset();
+			LoadCurrentSettings();
 			SceneView.RepaintAll();
 
-			// Rebuild any open GridManagerWindow so UIElements fields reflect the undone/redone state.
 			foreach (var win in Resources.FindObjectsOfTypeAll<GridManagerWindow>())
 				win.CreateGUI();
 		}
 
-		private static void RecordUndo(string label) =>
+		private static void RecordUndo(string label)
+		{
+			if (ActiveProfile != null)
+				Undo.RecordObject(ActiveProfile, label);
 			Undo.RecordObject(GridSettingsAsset.instance, label);
+		}
 
 		// ─── Load ──────────────────────────────────────────────────────────────
-		/// <summary>Load all settings from the persisted asset.</summary>
+		/// <summary>
+		/// Loads settings from the ActiveProfile if available, otherwise falls back to GridSettingsAsset.
+		/// ShowGrid is always loaded from GridSettingsAsset (editor-wide).
+		/// </summary>
+		public static void LoadCurrentSettings()
+		{
+			// ShowGrid is strictly editor-wide
+			ShowGrid = GridSettingsAsset.instance.ShowGrid;
+			MainSettingsCollapsed = GridSettingsAsset.instance.LayoutCollapsed;
+			InteractionCollapsed  = GridSettingsAsset.instance.SnappingCollapsed;
+			EditingCollapsed      = GridSettingsAsset.instance.EditingCollapsed;
+			VisualsCollapsed      = GridSettingsAsset.instance.ColorsCollapsed;
+
+			if (ActiveProfile != null)
+			{
+				var p = ActiveProfile;
+				GridColor           = p.GridColor;
+				XAxisColor          = p.XAxisColor;
+				YAxisColor          = p.YAxisColor;
+				GridSpacingX        = p.GridSpacingX;
+				GridSpacingY        = p.GridSpacingY;
+				GridColumns         = p.GridColumns;
+				GridRows            = p.GridRows;
+				CurrentMode         = p.CurrentMode;
+				CurrentSymmetryMode = p.CurrentSymmetryMode;
+				CurrentDynamicType  = p.CurrentDynamicType;
+
+				DynamicStretchX     = new List<float>(p.DynamicStretchX);
+				DynamicStretchY     = new List<float>(p.DynamicStretchY);
+				DynamicFixedX       = new List<float>(p.DynamicFixedX);
+				DynamicFixedY       = new List<float>(p.DynamicFixedY);
+
+				AxisThickness       = p.AxisThickness;
+				GridThickness       = p.GridThickness;
+				GridOpacity         = p.GridOpacity;
+				SnapToElements      = p.SnapToElements;
+				SnapElementsToGrid  = p.SnapElementsToGrid;
+				SnapDistance        = p.SnapDistance;
+				ElementSnapDistance = p.ElementSnapDistance;
+			}
+			else
+			{
+				ResetCacheToDefaults();
+			}
+		}
+
+		/// <summary>Resets the runtime cache to standard default values when no profile is active.</summary>
+		public static void ResetCacheToDefaults()
+		{
+			GridColor     = new Color(0.3f, 0.7f, 1f, 0.25f);
+			XAxisColor    = new Color(1f,   0.3f, 0.3f, 0.8f);
+			YAxisColor    = new Color(0.3f, 1f,   0.3f, 0.8f);
+			GridSpacingX  = 50f;
+			GridSpacingY  = 50f;
+			GridColumns   = 10;
+			GridRows      = 10;
+			CurrentMode         = GridMode.UniformGrid;
+			CurrentSymmetryMode = SymmetryMode.StretchWithCanvas;
+			CurrentDynamicType  = DynamicGridType.StretchWithCanvas;
+			DynamicStretchX.Clear();
+			DynamicStretchY.Clear();
+			DynamicFixedX.Clear();
+			DynamicFixedY.Clear();
+			AxisThickness = 3f;
+			GridThickness = 1f;
+			GridOpacity   = 1f;
+			SnapToElements = true;
+			SnapElementsToGrid = false;
+			SnapDistance  = 3f;
+			ElementSnapDistance = 1f;
+		}
+
+		/// <summary>Load settings from the persisted global fallback asset.</summary>
 		public static void LoadFromAsset()
 		{
-			var a     = GridSettingsAsset.instance;
-			GridColor     = a.GridColor;
-			XAxisColor    = a.XAxisColor;
-			YAxisColor    = a.YAxisColor;
-			GridSpacingX  = a.GridSpacingX;
-			GridSpacingY  = a.GridSpacingY;
+			var a = GridSettingsAsset.instance;
+			GridColor           = a.GridColor;
+			XAxisColor          = a.XAxisColor;
+			YAxisColor          = a.YAxisColor;
+			GridSpacingX        = a.GridSpacingX;
+			GridSpacingY        = a.GridSpacingY;
 			GridColumns         = a.GridColumns;
 			GridRows            = a.GridRows;
 			CurrentMode         = (GridMode)a.GridModeIndex;
 			CurrentSymmetryMode = (SymmetryMode)a.SymmetryModeIndex;
 			CurrentDynamicType  = (DynamicGridType)a.DynamicTypeIndex;
 
-			DynamicStretchX = new List<float>(a.DynamicStretchX);
-			DynamicStretchY = new List<float>(a.DynamicStretchY);
-			DynamicFixedX   = new List<float>(a.DynamicFixedX);
-			DynamicFixedY   = new List<float>(a.DynamicFixedY);
+			DynamicStretchX     = new List<float>(a.DynamicStretchX);
+			DynamicStretchY     = new List<float>(a.DynamicStretchY);
+			DynamicFixedX       = new List<float>(a.DynamicFixedX);
+			DynamicFixedY       = new List<float>(a.DynamicFixedY);
 
-			AxisThickness = a.AxisThickness;
-			GridThickness = a.GridThickness;
-			ShowGrid       = a.ShowGrid;
-			GridOpacity    = a.GridOpacity;
-			SnapToElements = a.SnapToElements;
-			SnapElementsToGrid = a.SnapElementsToGrid;
-			SnapDistance   = a.SnapDistance;
+			AxisThickness       = a.AxisThickness;
+			GridThickness       = a.GridThickness;
+			ShowGrid            = a.ShowGrid;
+			GridOpacity         = a.GridOpacity;
+			SnapToElements      = a.SnapToElements;
+			SnapElementsToGrid  = a.SnapElementsToGrid;
+			SnapDistance        = a.SnapDistance;
 			ElementSnapDistance = a.ElementSnapDistance;
-
-			MainSettingsCollapsed = a.LayoutCollapsed;
-			InteractionCollapsed  = a.SnappingCollapsed;
-			EditingCollapsed      = a.EditingCollapsed;
-			VisualsCollapsed      = a.ColorsCollapsed;
 		}
 
+		private static void MarkProfileDirty()
+		{
+			if (ActiveProfile != null)
+				EditorUtility.SetDirty(ActiveProfile);
+		}
+
+		// ─── Profile Creation & Assignment ─────────────────────────────────────
+		/// <summary>
+		/// Synchronizes the active Canvas selection from the Scene or Hierarchy.
+		/// Loads the linked profile if one exists, or clears ActiveProfile if not.
+		/// Refreshes open GridManagerWindow instances and repaints SceneView.
+		/// </summary>
+		public static void SyncCanvasSelection(Canvas canvas)
+		{
+			var link = canvas != null ? canvas.GetComponent<GridCanvasLink>() : null;
+			var prof = link != null ? link.Profile : null;
+
+			if (ActiveCanvas == canvas && ActiveProfile == prof) return;
+
+			ActiveCanvas = canvas;
+			ActiveProfile = prof;
+
+			LoadCurrentSettings();
+			SceneView.RepaintAll();
+
+			foreach (var win in Resources.FindObjectsOfTypeAll<GridManagerWindow>())
+			{
+				win.CreateGUI();
+			}
+		}
+
+		/// <summary>
+		/// Creates a new GridProfile asset in the Profiles/ folder with clean default settings,
+		/// attaches GridCanvasLink to the canvas, and binds it as active.
+		/// </summary>
+		public static GridProfile CreateProfileForCanvas(Canvas canvas, string customName = null)
+		{
+			if (canvas == null) return null;
+
+			string folderPath = "Assets/AZSoftStudio/UI Furnace - Grid Guide (Lite)/Profiles";
+			EnsureFolderExists(folderPath);
+
+			string rawName = string.IsNullOrEmpty(customName) ? canvas.gameObject.name : customName;
+			string cleanName = string.Join("_", rawName.Split(System.IO.Path.GetInvalidFileNameChars()));
+			string assetPath = AssetDatabase.GenerateUniqueAssetPath($"{folderPath}/{cleanName}_GridProfile.asset");
+
+			var profile = ScriptableObject.CreateInstance<GridProfile>();
+			profile.name = System.IO.Path.GetFileNameWithoutExtension(assetPath);
+
+			AssetDatabase.CreateAsset(profile, assetPath);
+			AssetDatabase.SaveAssets();
+
+			AssignProfileToCanvas(canvas, profile);
+			return profile;
+		}
+
+		/// <summary>Assigns an existing GridProfile to a Canvas, marks scene dirty, and refreshes views.</summary>
+		public static void AssignProfileToCanvas(Canvas canvas, GridProfile profile, bool refreshWindow = true)
+		{
+			if (canvas == null) return;
+
+			var link = canvas.GetComponent<GridCanvasLink>();
+			if (link == null)
+				link = Undo.AddComponent<GridCanvasLink>(canvas.gameObject);
+			else
+				Undo.RecordObject(link, "Assign Grid Profile");
+
+			link.Profile = profile;
+			EditorUtility.SetDirty(link);
+
+			if (!Application.isPlaying && canvas.gameObject.scene.IsValid())
+			{
+				UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(canvas.gameObject.scene);
+			}
+
+			ActiveCanvas = canvas;
+			ActiveProfile = profile;
+			LoadCurrentSettings();
+
+			SceneView.RepaintAll();
+
+			if (refreshWindow)
+			{
+				foreach (var win in Resources.FindObjectsOfTypeAll<GridManagerWindow>())
+					win.CreateGUI();
+			}
+		}
+
+		public static GridProfile CloneActiveProfile(string newName = null)
+		{
+			if (ActiveProfile == null || ActiveCanvas == null) return null;
+
+			string folderPath = "Assets/AZSoftStudio/UI Furnace - Grid Guide (Lite)/Profiles";
+			EnsureFolderExists(folderPath);
+
+			string baseName = string.IsNullOrEmpty(newName) ? $"{ActiveProfile.name}_Copy" : newName;
+			string assetPath = AssetDatabase.GenerateUniqueAssetPath($"{folderPath}/{baseName}.asset");
+
+			var clone = ScriptableObject.CreateInstance<GridProfile>();
+			clone.CopyFrom(ActiveProfile);
+
+			AssetDatabase.CreateAsset(clone, assetPath);
+			AssetDatabase.SaveAssets();
+
+			AssignProfileToCanvas(ActiveCanvas, clone);
+			return clone;
+		}
+
+		private static void EnsureFolderExists(string targetFolder)
+		{
+			string[] parts = targetFolder.Split('/');
+			string current = parts[0];
+			for (int i = 1; i < parts.Length; i++)
+			{
+				string next = current + "/" + parts[i];
+				if (!AssetDatabase.IsValidFolder(next))
+					AssetDatabase.CreateFolder(current, parts[i]);
+				current = next;
+			}
+		}
 
 		// ─── Immediate saves (with Undo) ───────────────────────────────────────
 		public static void SaveVisibility(bool show)
 		{
-			RecordUndo("Toggle Grid Visibility");
+			Undo.RecordObject(GridSettingsAsset.instance, "Toggle Grid Visibility");
 			ShowGrid = show;
 			var a = GridSettingsAsset.instance; a.ShowGrid = show; a.SaveToDisk();
 		}
@@ -144,6 +329,13 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 				IsMirrorModeActive = false;
 				GridRenderer.IsAddLinesMode = false;
 			}
+
+			if (ActiveProfile != null)
+			{
+				ActiveProfile.CurrentMode = mode;
+				MarkProfileDirty();
+			}
+
 			var a = GridSettingsAsset.instance; a.GridModeIndex = (int)mode; a.SaveToDisk();
 		}
 
@@ -154,6 +346,16 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 			SnapElementsToGrid = snapGrid;
 			SnapDistance = distance;
 			ElementSnapDistance = elementDistance;
+
+			if (ActiveProfile != null)
+			{
+				ActiveProfile.SnapToElements = snap;
+				ActiveProfile.SnapElementsToGrid = snapGrid;
+				ActiveProfile.SnapDistance = distance;
+				ActiveProfile.ElementSnapDistance = elementDistance;
+				MarkProfileDirty();
+			}
+
 			var a = GridSettingsAsset.instance;
 			a.SnapToElements = snap;
 			a.SnapElementsToGrid = snapGrid;
@@ -166,22 +368,26 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 		{
 			RecordUndo("Change Symmetry Mode");
 			CurrentSymmetryMode = mode;
+
+			if (ActiveProfile != null)
+			{
+				ActiveProfile.CurrentSymmetryMode = mode;
+				MarkProfileDirty();
+			}
+
 			var a = GridSettingsAsset.instance; a.SymmetryModeIndex = (int)mode; a.SaveToDisk();
 		}
 
 		public static void SaveDynamicType(DynamicGridType type, float canvasWidth, float canvasHeight)
 		{
-			// Guard against zero canvas size to avoid division-by-zero
-			// and silent zero-overwrite of all guides.
 			if (canvasWidth < 0.001f || canvasHeight < 0.001f)
 			{
-				UnityEngine.Debug.LogWarning("[UI Furnace] Cannot convert Dynamic grid type: canvas size is zero. Select a UI element first.");
+				Debug.LogWarning("[UI Furnace] Cannot convert Dynamic grid type: canvas size is zero. Select a UI element first.");
 				return;
 			}
 
 			RecordUndo("Change Dynamic Grid Type");
 
-			// Conversion WITHOUT clamping so out-of-bounds guides stay intact
 			if (CurrentDynamicType == DynamicGridType.StretchWithCanvas && type == DynamicGridType.FixedPosition)
 			{
 				DynamicFixedX.Clear();
@@ -199,10 +405,17 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 
 			CurrentDynamicType = type;
 
-			// Record Undo on the asset right before mutating its list fields
-			// so the serialized data is included in the Undo snapshot.
+			if (ActiveProfile != null)
+			{
+				ActiveProfile.CurrentDynamicType = type;
+				ActiveProfile.DynamicStretchX  = new List<float>(DynamicStretchX);
+				ActiveProfile.DynamicStretchY  = new List<float>(DynamicStretchY);
+				ActiveProfile.DynamicFixedX    = new List<float>(DynamicFixedX);
+				ActiveProfile.DynamicFixedY    = new List<float>(DynamicFixedY);
+				MarkProfileDirty();
+			}
+
 			var a = GridSettingsAsset.instance;
-			Undo.RecordObject(a, "Change Dynamic Grid Type");
 			a.DynamicTypeIndex = (int)type;
 			a.DynamicStretchX  = new List<float>(DynamicStretchX);
 			a.DynamicStretchY  = new List<float>(DynamicStretchY);
@@ -214,6 +427,16 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 		public static void SaveDynamicLists()
 		{
 			RecordUndo("Edit Dynamic Lines");
+
+			if (ActiveProfile != null)
+			{
+				ActiveProfile.DynamicStretchX = new List<float>(DynamicStretchX);
+				ActiveProfile.DynamicStretchY = new List<float>(DynamicStretchY);
+				ActiveProfile.DynamicFixedX   = new List<float>(DynamicFixedX);
+				ActiveProfile.DynamicFixedY   = new List<float>(DynamicFixedY);
+				MarkProfileDirty();
+			}
+
 			var a = GridSettingsAsset.instance;
 			a.DynamicStretchX = new List<float>(DynamicStretchX);
 			a.DynamicStretchY = new List<float>(DynamicStretchY);
@@ -227,6 +450,14 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 			RecordUndo("Set Grid Spacing");
 			GridSpacingX = Mathf.Max(0.1f, spacingX);
 			GridSpacingY = Mathf.Max(0.1f, spacingY);
+
+			if (ActiveProfile != null)
+			{
+				ActiveProfile.GridSpacingX = GridSpacingX;
+				ActiveProfile.GridSpacingY = GridSpacingY;
+				MarkProfileDirty();
+			}
+
 			var a = GridSettingsAsset.instance;
 			a.GridSpacingX = GridSpacingX; a.GridSpacingY = GridSpacingY; a.SaveToDisk();
 		}
@@ -236,6 +467,14 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 			RecordUndo("Set Grid Divisions");
 			GridColumns = Mathf.Max(1, columns);
 			GridRows    = Mathf.Max(1, rows);
+
+			if (ActiveProfile != null)
+			{
+				ActiveProfile.GridColumns = GridColumns;
+				ActiveProfile.GridRows    = GridRows;
+				MarkProfileDirty();
+			}
+
 			var a = GridSettingsAsset.instance;
 			a.GridColumns = GridColumns; a.GridRows = GridRows; a.SaveToDisk();
 		}
@@ -243,19 +482,31 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 		public static void SaveThickness(float axisThickness, float gridThickness)
 		{
 			RecordUndo("Change Grid Thickness");
-			// Clamp here so callers (e.g. undo restore) can never push
-			// a negative value to Handles.DrawAAPolyLine, which has undefined behaviour.
 			AxisThickness = Mathf.Max(0.1f, axisThickness);
 			GridThickness = Mathf.Max(0.1f, gridThickness);
+
+			if (ActiveProfile != null)
+			{
+				ActiveProfile.AxisThickness = AxisThickness;
+				ActiveProfile.GridThickness = GridThickness;
+				MarkProfileDirty();
+			}
+
 			var a = GridSettingsAsset.instance;
 			a.AxisThickness = AxisThickness; a.GridThickness = GridThickness; a.SaveToDisk();
 		}
 
-		/// <summary>Immediate save for a named color key (GridColor / XAxisColor / YAxisColor).</summary>
 		public static void SaveColor(string key, Color color)
 		{
 			RecordUndo($"Change {key}");
 			ApplyColorToCache(key, color);
+
+			if (ActiveProfile != null)
+			{
+				ApplyColorToProfile(ActiveProfile, key, color);
+				MarkProfileDirty();
+			}
+
 			var a = GridSettingsAsset.instance;
 			ApplyColorToAsset(a, key, color);
 			a.SaveToDisk();
@@ -279,6 +530,13 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 		{
 			RecordUndo("Change Grid Opacity");
 			GridOpacity = Mathf.Clamp01(opacity);
+
+			if (ActiveProfile != null)
+			{
+				ActiveProfile.GridOpacity = GridOpacity;
+				MarkProfileDirty();
+			}
+
 			var a = GridSettingsAsset.instance; a.GridOpacity = GridOpacity; a.SaveToDisk();
 		}
 
@@ -288,7 +546,16 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 			GridSpacingX = Mathf.Max(0.1f, spacingX);
 			GridSpacingY = Mathf.Max(0.1f, spacingY);
 			var sx = GridSpacingX; var sy = GridSpacingY;
-			ScheduleDelayedSave("SaveSpacing", () => { var a = GridSettingsAsset.instance; a.GridSpacingX = sx; a.GridSpacingY = sy; });
+			ScheduleDelayedSave("SaveSpacing", () =>
+			{
+				if (ActiveProfile != null)
+				{
+					ActiveProfile.GridSpacingX = sx;
+					ActiveProfile.GridSpacingY = sy;
+					MarkProfileDirty();
+				}
+				var a = GridSettingsAsset.instance; a.GridSpacingX = sx; a.GridSpacingY = sy;
+			});
 		}
 
 		public static void QueueSaveDivisions(int columns, int rows)
@@ -296,22 +563,47 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 			GridColumns = Mathf.Max(1, columns);
 			GridRows    = Mathf.Max(1, rows);
 			var c = GridColumns; var r = GridRows;
-			ScheduleDelayedSave("SaveDivisions", () => { var a = GridSettingsAsset.instance; a.GridColumns = c; a.GridRows = r; });
+			ScheduleDelayedSave("SaveDivisions", () =>
+			{
+				if (ActiveProfile != null)
+				{
+					ActiveProfile.GridColumns = c;
+					ActiveProfile.GridRows = r;
+					MarkProfileDirty();
+				}
+				var a = GridSettingsAsset.instance; a.GridColumns = c; a.GridRows = r;
+			});
 		}
 
 		public static void QueueSaveThickness(float axisThickness, float gridThickness)
 		{
 			AxisThickness = axisThickness; GridThickness = gridThickness;
 			var at = axisThickness; var gt = gridThickness;
-			ScheduleDelayedSave("SaveThickness", () => { var a = GridSettingsAsset.instance; a.AxisThickness = at; a.GridThickness = gt; });
+			ScheduleDelayedSave("SaveThickness", () =>
+			{
+				if (ActiveProfile != null)
+				{
+					ActiveProfile.AxisThickness = at;
+					ActiveProfile.GridThickness = gt;
+					MarkProfileDirty();
+				}
+				var a = GridSettingsAsset.instance; a.AxisThickness = at; a.GridThickness = gt;
+			});
 		}
 
-		/// <summary>Debounced color save — used during color picker drag (no Undo per frame).</summary>
 		public static void QueueSaveColor(string key, Color color)
 		{
 			ApplyColorToCache(key, color);
 			var k = key; var c = color;
-			ScheduleDelayedSave("SaveColor_" + key, () => { var a = GridSettingsAsset.instance; ApplyColorToAsset(a, k, c); });
+			ScheduleDelayedSave("SaveColor_" + key, () =>
+			{
+				if (ActiveProfile != null)
+				{
+					ApplyColorToProfile(ActiveProfile, k, c);
+					MarkProfileDirty();
+				}
+				var a = GridSettingsAsset.instance; ApplyColorToAsset(a, k, c);
+			});
 		}
 
 		// ─── Debounce engine ───────────────────────────────────────────────────
@@ -338,10 +630,10 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 
 			if (EditorApplication.timeSinceStartup - s_LastChangeTime >= SaveDelaySeconds)
 			{
-				Undo.RecordObject(GridSettingsAsset.instance, "Change Grid Settings");
+				RecordUndo("Change Grid Settings");
 				foreach (var action in s_PendingSaveActions.Values) action?.Invoke();
 				s_PendingSaveActions.Clear();
-				GridSettingsAsset.instance.SaveToDisk(); // single disk write after all field updates
+				GridSettingsAsset.instance.SaveToDisk();
 				s_IsDelayedSaveScheduled = false;
 				EditorApplication.update -= CheckPendingSave;
 			}
@@ -351,7 +643,7 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 		{
 			if (s_PendingSaveActions.Count > 0)
 			{
-				Undo.RecordObject(GridSettingsAsset.instance, "Change Grid Settings");
+				RecordUndo("Change Grid Settings");
 				foreach (var action in s_PendingSaveActions.Values) action?.Invoke();
 				s_PendingSaveActions.Clear();
 				GridSettingsAsset.instance.SaveToDisk();
@@ -360,34 +652,68 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 			}
 		}
 
-		/// <summary>
-		/// Resets every persisted setting back to its factory default and saves to disk.
-		/// Registered with Unity's Undo system so it can be undone.
-		/// </summary>
 		public static void ResetAllToDefaults()
 		{
 			RecordUndo("Reset All Grid Settings");
-			var a = GridSettingsAsset.instance;
 
-			a.GridColor     = GridColor     = new Color(0.3f, 0.7f, 1f, 0.25f);
-			a.XAxisColor    = XAxisColor    = new Color(1f,   0.3f, 0.3f, 0.8f);
-			a.YAxisColor    = YAxisColor    = new Color(0.3f, 1f,   0.3f, 0.8f);
-			a.GridSpacingX  = GridSpacingX  = 50f;
-			a.GridSpacingY  = GridSpacingY  = 50f;
-			a.GridColumns   = GridColumns   = 10;
-			a.GridRows      = GridRows      = 10;
-			a.GridModeIndex = 0;  CurrentMode         = GridMode.UniformGrid;
-			a.SymmetryModeIndex = 1; CurrentSymmetryMode = SymmetryMode.StretchWithCanvas;
-			a.DynamicTypeIndex  = 1; CurrentDynamicType  = DynamicGridType.StretchWithCanvas;
-			a.AxisThickness = AxisThickness = 3f;
-			a.GridThickness = GridThickness = 1f;
-			a.ShowGrid      = ShowGrid      = true;
-			a.GridOpacity   = GridOpacity   = 1f;
-			a.SnapToElements = SnapToElements = true;
-			a.SnapElementsToGrid = SnapElementsToGrid = false;
-			a.SnapDistance  = SnapDistance  = 3f;
-			a.ElementSnapDistance = ElementSnapDistance = 1f;
-			// Dynamic lines are NOT cleared — user must clear those manually
+			GridColor     = new Color(0.3f, 0.7f, 1f, 0.25f);
+			XAxisColor    = new Color(1f,   0.3f, 0.3f, 0.8f);
+			YAxisColor    = new Color(0.3f, 1f,   0.3f, 0.8f);
+			GridSpacingX  = 50f;
+			GridSpacingY  = 50f;
+			GridColumns   = 10;
+			GridRows      = 10;
+			CurrentMode         = GridMode.UniformGrid;
+			CurrentSymmetryMode = SymmetryMode.StretchWithCanvas;
+			CurrentDynamicType  = DynamicGridType.StretchWithCanvas;
+			AxisThickness = 3f;
+			GridThickness = 1f;
+			GridOpacity   = 1f;
+			SnapToElements = true;
+			SnapElementsToGrid = false;
+			SnapDistance  = 3f;
+			ElementSnapDistance = 1f;
+
+			if (ActiveProfile != null)
+			{
+				ActiveProfile.GridColor = GridColor;
+				ActiveProfile.XAxisColor = XAxisColor;
+				ActiveProfile.YAxisColor = YAxisColor;
+				ActiveProfile.GridSpacingX = GridSpacingX;
+				ActiveProfile.GridSpacingY = GridSpacingY;
+				ActiveProfile.GridColumns = GridColumns;
+				ActiveProfile.GridRows = GridRows;
+				ActiveProfile.CurrentMode = CurrentMode;
+				ActiveProfile.CurrentSymmetryMode = CurrentSymmetryMode;
+				ActiveProfile.CurrentDynamicType = CurrentDynamicType;
+				ActiveProfile.AxisThickness = AxisThickness;
+				ActiveProfile.GridThickness = GridThickness;
+				ActiveProfile.GridOpacity = GridOpacity;
+				ActiveProfile.SnapToElements = SnapToElements;
+				ActiveProfile.SnapElementsToGrid = SnapElementsToGrid;
+				ActiveProfile.SnapDistance = SnapDistance;
+				ActiveProfile.ElementSnapDistance = ElementSnapDistance;
+				MarkProfileDirty();
+			}
+
+			var a = GridSettingsAsset.instance;
+			a.GridColor     = GridColor;
+			a.XAxisColor    = XAxisColor;
+			a.YAxisColor    = YAxisColor;
+			a.GridSpacingX  = GridSpacingX;
+			a.GridSpacingY  = GridSpacingY;
+			a.GridColumns   = GridColumns;
+			a.GridRows      = GridRows;
+			a.GridModeIndex = 0;
+			a.SymmetryModeIndex = 1;
+			a.DynamicTypeIndex  = 1;
+			a.AxisThickness = AxisThickness;
+			a.GridThickness = GridThickness;
+			a.GridOpacity   = GridOpacity;
+			a.SnapToElements = SnapToElements;
+			a.SnapElementsToGrid = SnapElementsToGrid;
+			a.SnapDistance  = SnapDistance;
+			a.ElementSnapDistance = ElementSnapDistance;
 			a.SaveToDisk();
 		}
 
@@ -399,6 +725,16 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 				case "GridColor":  GridColor  = color; break;
 				case "XAxisColor": XAxisColor = color; break;
 				case "YAxisColor": YAxisColor = color; break;
+			}
+		}
+
+		private static void ApplyColorToProfile(GridProfile p, string key, Color color)
+		{
+			switch (key)
+			{
+				case "GridColor":  p.GridColor  = color; break;
+				case "XAxisColor": p.XAxisColor = color; break;
+				case "YAxisColor": p.YAxisColor = color; break;
 			}
 		}
 

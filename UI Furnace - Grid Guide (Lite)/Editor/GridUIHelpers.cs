@@ -180,6 +180,19 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 				case "AxisThickness":  a.AxisThickness = v; break;
 				case "GridThickness":  a.GridThickness = v; break;
 			}
+
+			if (GridSettings.ActiveProfile != null)
+			{
+				var p = GridSettings.ActiveProfile;
+				switch (key)
+				{
+					case "SpacingX":       p.GridSpacingX  = v; break;
+					case "SpacingY":       p.GridSpacingY  = v; break;
+					case "AxisThickness":  p.AxisThickness = v; break;
+					case "GridThickness":  p.GridThickness = v; break;
+				}
+				EditorUtility.SetDirty(p);
+			}
 		}
 
 		private static void SetAssetInt(GridSettingsAsset a, string key, int v)
@@ -188,6 +201,17 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 			{
 				case "Columns": a.GridColumns = v; break;
 				case "Rows":    a.GridRows    = v; break;
+			}
+
+			if (GridSettings.ActiveProfile != null)
+			{
+				var p = GridSettings.ActiveProfile;
+				switch (key)
+				{
+					case "Columns": p.GridColumns = v; break;
+					case "Rows":    p.GridRows    = v; break;
+				}
+				EditorUtility.SetDirty(p);
 			}
 		}
 

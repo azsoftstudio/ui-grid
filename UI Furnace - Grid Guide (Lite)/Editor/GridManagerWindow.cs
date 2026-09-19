@@ -15,6 +15,9 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 		private static GridManagerWindow _window;
 		internal static GridManagerWindow Instance => _window;
 		private VisualElement _layoutCardSlot;
+		private ObjectField _profileField;
+		private VisualElement _profileActionsSlot;
+		private VisualElement _settingsContainer;
 
 		[MenuItem("Tools/UI Furnace/Grid Manager", false, 0)]
 		public static void ShowWindow()
@@ -38,7 +41,7 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 
 		public void CreateGUI()
 		{
-			GridSettings.LoadFromAsset();
+			GridSettings.LoadCurrentSettings();
 			rootVisualElement.Clear();
 
 			var scroll = new ScrollView(ScrollViewMode.Vertical) { style = { flexGrow = 1 } };
@@ -87,40 +90,60 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 			titleRow.Add(helpBtn);
 			root.Add(titleRow);
 
-			// "No canvas selected" empty state + World Space warning
-			var contextBox = new IMGUIContainer(() =>
+			// World Space warning if active
+			if (GridRenderer.IsWorldSpaceCanvas)
 			{
-				if (GridRenderer.IsWorldSpaceCanvas)
-					EditorGUILayout.HelpBox("World Space canvases don't work with this grid. Please click on any UI element inside a normal Screen Space canvas first.", MessageType.Info);
-				else if (GridRenderer.GetCanvasSize() == Vector2.zero && !GridRenderer.IsWorldSpaceCanvas)
-					EditorGUILayout.HelpBox("Click on any UI element in your canvas to turn on the grid.", MessageType.Info);
-			});
-			root.Add(contextBox);
+				var worldWarning = new HelpBox("World Space canvases don't work with this grid. Please click on any UI element inside a normal Screen Space canvas first.", HelpBoxMessageType.Info);
+				root.Add(worldWarning);
+			}
 
 			// =========================================================================
-			// 1. GLOBAL SETTINGS (Unburied)
+			// 1. GLOBAL SETTINGS (Show Grid is editor-wide, outside profile)
 			// =========================================================================
-			var visRow = new VisualElement { style = { flexDirection = FlexDirection.Row, alignItems = Align.Center, justifyContent = Justify.SpaceBetween, marginTop = 4, marginBottom = 12 } };
+			var visRow = new VisualElement { style = { flexDirection = FlexDirection.Row, alignItems = Align.Center, justifyContent = Justify.SpaceBetween, marginTop = 4, marginBottom = 8 } };
 			var showGridToggle = new Toggle("Show Grid") { value = GridSettings.ShowGrid, style = { unityFontStyleAndWeight = FontStyle.Bold } };
 			showGridToggle.RegisterValueChangedCallback(evt => { GridSettings.SaveVisibility(evt.newValue); SceneView.RepaintAll(); });
 			visRow.Add(showGridToggle);
 			visRow.Add(new Label("Alt+G") { style = { fontSize = 10, unityFontStyleAndWeight = FontStyle.Italic, opacity = 0.6f } });
 			root.Add(visRow);
 
-
 			// =========================================================================
-			// 2. MAIN SETTINGS (The Core Grid)
+			// 2. CANVAS & PROFILE MANAGEMENT
+			// =========================================================================
+			root.Add(CreateCanvasAndProfileCard());
+
+			_settingsContainer = new VisualElement();
+			root.Add(_settingsContainer);
+			UpdateSettingsSection(GridSettings.ActiveProfile);
+		}
+
+		private void UpdateSettingsSection(GridProfile profile)
+		{
+			if (_settingsContainer == null) return;
+
+			bool hasProf = profile != null;
+			_settingsContainer.SetEnabled(hasProf);
+			_settingsContainer.style.opacity = hasProf ? 1f : 0.45f;
+
+			_settingsContainer.Clear();
+			BuildSettings(_settingsContainer);
+		}
+
+		private void BuildSettings(VisualElement settingsContainer)
+		{
+			// =========================================================================
+			// 3. MAIN SETTINGS (The Core Grid)
 			// =========================================================================
 			_layoutCardSlot = new VisualElement();
 			_layoutCardSlot.Add(CreateGridLayoutCard());
-			root.Add(_layoutCardSlot);
+			settingsContainer.Add(_layoutCardSlot);
 
 			// =========================================================================
-			// 3. UI INTERACTION (Snapping UI Elements)
+			// 4. UI INTERACTION (Snapping UI Elements)
 			// =========================================================================
 			var interactionFoldout = new Foldout { text = "UI Interaction", value = !GridSettings.InteractionCollapsed, style = { marginTop = 8 } };
 			interactionFoldout.RegisterValueChangedCallback(evt => GridSettings.SaveCollapseState("Interaction", !evt.newValue));
-			root.Add(interactionFoldout);
+			settingsContainer.Add(interactionFoldout);
 
 			var interactionGroup = new VisualElement { style = { marginLeft = 15 } };
 			
@@ -143,11 +166,11 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 			interactionFoldout.Add(interactionGroup);
 
 			// =========================================================================
-			// 4. GRID EDITING (Mode-Specific Editing Tools)
+			// 5. GRID EDITING (Mode-Specific Editing Tools)
 			// =========================================================================
 			var editingFoldout = new Foldout { text = "Grid Editing", value = !GridSettings.EditingCollapsed, style = { marginTop = 8 } };
 			editingFoldout.RegisterValueChangedCallback(evt => GridSettings.SaveCollapseState("Editing", !evt.newValue));
-			root.Add(editingFoldout);
+			settingsContainer.Add(editingFoldout);
 
 			var editingGroup = new VisualElement { style = { marginLeft = 15 } };
 			editingFoldout.Add(editingGroup);
@@ -228,19 +251,18 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 			}
 
 			// =========================================================================
-			// 5. VISUALS & APPEARANCE (The Look)
+			// 6. VISUALS & APPEARANCE (The Look)
 			// =========================================================================
 			var visualsFoldout = new Foldout { text = "Visuals & Appearance", value = !GridSettings.VisualsCollapsed, style = { marginTop = 8 } };
 			visualsFoldout.RegisterValueChangedCallback(evt => GridSettings.SaveCollapseState("Visuals", !evt.newValue));
-			root.Add(visualsFoldout);
+			settingsContainer.Add(visualsFoldout);
 
 			var visualsContainer = new VisualElement { style = { marginLeft = 15 } };
 			visualsFoldout.Add(visualsContainer);
 
 			GridUIHelpers.AddOpacitySlider(visualsContainer, GridSettings.GridOpacity, val =>
 			{
-				GridSettings.GridOpacity = val;
-				GridSettings.ScheduleDelayedSave("GridOpacity", () => { GridSettingsAsset.instance.GridOpacity = val; });
+				GridSettings.SaveOpacity(val);
 				SceneView.RepaintAll();
 			}, onBlur: () => GridSettings.FlushPendingSaves());
 
@@ -254,18 +276,18 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 
 			GridUIHelpers.AddFloatField(visualsContainer, "Axis Thickness",  "AxisThickness", GridSettings.AxisThickness, val =>
 			{
-				GridSettings.AxisThickness = Mathf.Max(0.1f, val);
+				GridSettings.SaveThickness(Mathf.Max(0.1f, val), GridSettings.GridThickness);
 				SceneView.RepaintAll();
 			});
 			GridUIHelpers.AddFloatField(visualsContainer, "Grid Thickness",  "GridThickness", GridSettings.GridThickness, val =>
 			{
-				GridSettings.GridThickness = Mathf.Max(0.1f, val);
+				GridSettings.SaveThickness(GridSettings.AxisThickness, Mathf.Max(0.1f, val));
 				SceneView.RepaintAll();
 			});
 
 
 			// Footer & Reset
-			root.Add(new Label($"UI Furnace - Grid Guide (Lite) v{GridSettings.Version}")
+			settingsContainer.Add(new Label($"UI Furnace - Grid Guide (Lite) v{GridSettings.Version}")
 			{
 				style =
 				{
@@ -290,7 +312,183 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 				tooltip = "Click to put all settings back to default. Your custom lines are safe!",
 				style = { marginTop = 8, height = 22 }
 			};
-			root.Add(resetBtn);
+			settingsContainer.Add(resetBtn);
+		}
+
+		private VisualElement CreateCanvasAndProfileCard()
+		{
+			var card = new VisualElement
+			{
+				style =
+				{
+					backgroundColor = new Color(0f, 0f, 0f, 0.15f),
+					borderTopLeftRadius = 6, borderTopRightRadius = 6,
+					borderBottomLeftRadius = 6, borderBottomRightRadius = 6,
+					borderLeftWidth = 1, borderRightWidth = 1,
+					borderTopWidth = 1, borderBottomWidth = 1,
+					borderLeftColor = new Color(0.5f, 0.5f, 0.5f, 0.2f),
+					borderRightColor = new Color(0.5f, 0.5f, 0.5f, 0.2f),
+					borderTopColor = new Color(0.5f, 0.5f, 0.5f, 0.2f),
+					borderBottomColor = new Color(0.5f, 0.5f, 0.5f, 0.2f),
+					paddingLeft = 8, paddingRight = 8,
+					paddingTop = 8, paddingBottom = 8,
+					marginBottom = 10
+				}
+			};
+
+			var canvas = GridSettings.ActiveCanvas;
+			var profile = GridSettings.ActiveProfile;
+
+			// Active Canvas Row
+			var canvasRow = new VisualElement
+			{
+				style = { flexDirection = FlexDirection.Row, alignItems = Align.Center, justifyContent = Justify.SpaceBetween, marginBottom = 6 }
+			};
+
+			var canvasField = new ObjectField("Canvas")
+			{
+				objectType = typeof(Canvas),
+				value = canvas,
+				style = { flexGrow = 1, marginRight = 4 }
+			};
+			canvasField.RegisterValueChangedCallback(evt =>
+			{
+				var newCanvas = evt.newValue as Canvas;
+				GridSettings.SyncCanvasSelection(newCanvas);
+			});
+			canvasRow.Add(canvasField);
+
+			if (canvas != null)
+			{
+				var pingCanvasBtn = new Button(() =>
+				{
+					EditorGUIUtility.PingObject(canvas.gameObject);
+					Selection.activeGameObject = canvas.gameObject;
+				})
+				{
+					text = "Ping",
+					tooltip = "Select and ping this Canvas in the Hierarchy",
+					style = { height = 20, paddingLeft = 6, paddingRight = 6 }
+				};
+				canvasRow.Add(pingCanvasBtn);
+			}
+
+			card.Add(canvasRow);
+
+			// State 1: No Canvas Selected
+			if (canvas == null)
+			{
+				var noCanvasInfo = new HelpBox("Select a Canvas or UI element in the Hierarchy or Scene to edit its grid profile.", HelpBoxMessageType.Info);
+				card.Add(noCanvasInfo);
+				return card;
+			}
+
+			// Single persistent ObjectField for Grid Profile
+			var profileRow = new VisualElement
+			{
+				style = { flexDirection = FlexDirection.Row, alignItems = Align.Center, justifyContent = Justify.SpaceBetween }
+			};
+			_profileField = new ObjectField("Grid Profile")
+			{
+				objectType = typeof(GridProfile),
+				value = profile,
+				style = { flexGrow = 1 }
+			};
+
+			_profileActionsSlot = new VisualElement();
+
+			_profileField.RegisterValueChangedCallback(evt =>
+			{
+				var newProf = evt.newValue as GridProfile;
+				GridSettings.AssignProfileToCanvas(canvas, newProf, refreshWindow: false);
+				UpdateActionsSlot(_profileActionsSlot, canvas, newProf);
+				UpdateSettingsSection(newProf);
+			});
+			profileRow.Add(_profileField);
+			card.Add(profileRow);
+
+			UpdateActionsSlot(_profileActionsSlot, canvas, profile);
+			card.Add(_profileActionsSlot);
+
+			return card;
+		}
+
+		private void UpdateActionsSlot(VisualElement actionsSlot, Canvas canvas, GridProfile profile)
+		{
+			actionsSlot.Clear();
+			if (canvas == null) return;
+
+			if (profile == null)
+			{
+				var noProfileBox = new HelpBox($"Canvas '{canvas.name}' does not have a Grid Profile linked yet.", HelpBoxMessageType.Warning)
+				{
+					style = { marginBottom = 6, marginTop = 6 }
+				};
+				actionsSlot.Add(noProfileBox);
+
+				var createBtn = new Button(() =>
+				{
+					GridSettings.CreateProfileForCanvas(canvas);
+				})
+				{
+					text = $"+ Create Grid Profile for '{canvas.name}'",
+					tooltip = "Create a new ScriptableObject Grid Profile for this Canvas",
+					style =
+					{
+						height = 28,
+						unityFontStyleAndWeight = FontStyle.Bold,
+						backgroundColor = new Color(0.18f, 0.45f, 0.8f, 0.9f),
+						color = Color.white
+					}
+				};
+				actionsSlot.Add(createBtn);
+			}
+			else
+			{
+				var actionRow = new VisualElement
+				{
+					style = { flexDirection = FlexDirection.Row, justifyContent = Justify.FlexEnd, marginTop = 4 }
+				};
+
+				var newProfBtn = new Button(() =>
+				{
+					GridSettings.CreateProfileForCanvas(canvas);
+				})
+				{
+					text = "+ New",
+					tooltip = "Create and link a fresh new profile for this Canvas",
+					style = { height = 20, paddingLeft = 8, paddingRight = 8, marginRight = 4 }
+				};
+				actionRow.Add(newProfBtn);
+
+				var cloneBtn = new Button(() =>
+				{
+					var clone = GridSettings.CloneActiveProfile();
+					if (_profileField != null && clone != null)
+						_profileField.SetValueWithoutNotify(clone);
+					UpdateActionsSlot(actionsSlot, canvas, clone);
+					UpdateSettingsSection(clone);
+				})
+				{
+					text = "Clone",
+					tooltip = "Duplicate this profile to save a copy or create a variant",
+					style = { height = 20, paddingLeft = 8, paddingRight = 8, marginRight = 4 }
+				};
+				actionRow.Add(cloneBtn);
+
+				var pingProfBtn = new Button(() =>
+				{
+					EditorGUIUtility.PingObject(profile);
+				})
+				{
+					text = "Ping Profile",
+					tooltip = "Highlight this Grid Profile asset in the Project window",
+					style = { height = 20, paddingLeft = 8, paddingRight = 8 }
+				};
+				actionRow.Add(pingProfBtn);
+
+				actionsSlot.Add(actionRow);
+			}
 		}
 
 		private VisualElement CreateGridLayoutCard()

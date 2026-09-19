@@ -1,0 +1,35 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d7139f429b82ce341b02008883aef1bc, type: 3}
+  m_Name: vtg
+  m_EditorClassIdentifier: AZSoftStudio.UIFurnace.GridGuide.Runtime::AZSoftStudio.UIFurnace.GridGuide.GridProfile
+  GridColor: {r: 0.3, g: 0.7, b: 1, a: 0.25}
+  XAxisColor: {r: 1, g: 0.3, b: 0.3, a: 0.8}
+  YAxisColor: {r: 0.3, g: 1, b: 0.3, a: 0.8}
+  AxisThickness: 3
+  GridThickness: 1
+  GridOpacity: 1
+  CurrentMode: 0
+  CurrentSymmetryMode: 1
+  CurrentDynamicType: 1
+  GridSpacingX: 50
+  GridSpacingY: 50
+  GridColumns: 10
+  GridRows: 10
+  DynamicStretchX: []
+  DynamicStretchY: []
+  DynamicFixedX: []
+  DynamicFixedY: []
+  SnapToElements: 1
+  SnapElementsToGrid: 0
+  SnapDistance: 3
+  ElementSnapDistance: 1

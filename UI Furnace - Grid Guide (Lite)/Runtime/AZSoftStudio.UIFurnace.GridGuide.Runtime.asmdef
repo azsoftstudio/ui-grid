@@ -1,16 +1,13 @@
 {
-    "name": "AZSoftStudio.UIFurnace.GridGuide.Editor",
-    "references": [
-        "AZSoftStudio.UIFurnace.GridGuide.Runtime"
-    ],
-    "includePlatforms": [
-        "Editor"
-    ],
+    "name": "AZSoftStudio.UIFurnace.GridGuide.Runtime",
+    "rootNamespace": "AZSoftStudio.UIFurnace.GridGuide",
+    "references": [],
+    "includePlatforms": [],
     "excludePlatforms": [],
     "allowUnsafeCode": false,
     "overrideReferences": false,
     "precompiledReferences": [],
-    "autoReferenced": false,
+    "autoReferenced": true,
     "defineConstraints": [],
     "versionDefines": [],
     "noEngineReferences": false
