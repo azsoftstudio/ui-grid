@@ -25,16 +25,19 @@ This document outlines the complete plan for **Visual Feedback enhancements** (C
 ## 🎨 Phase 1: Visual Feedback Improvements
 
 ### 1. Smart Snapping & Magnetic "Lock-On" Feedback
-* **Snap Indicator on Floating Badge:**
-  * When a line or element snaps, the badge updates dynamically with a magnetic lock icon and target name:
-    * `🧲 X: +120 px (Snapped to 'Header')`
-  * Badge border transitions from neutral gray (`#737380`) to the bright snap color (`#FF14E6` or `#00E5FF`).
-* **Line Snap Color Flash / Pulse:**
-  * The dragged guide line temporarily glows or pulses with the snap accent color the exact frame it snaps, giving instant tactile confirmation.
-* **Alignment Projection Guides:**
-  * When snapping to a UI element, extend subtle dashed projection rays from the element's edge to the canvas boundary to clearly visualize the alignment relationship.
-* **Snap Impact Visual Pop:**
-  * A momentary subtle pulse or expanding corner bracket animation when an element locks onto a grid line.
+* **Adaptive Complementary Color [IMPLEMENTED]:**
+  * Real-time sampling of the snapped UI element's `Graphic` color.
+  * Dynamically computes 180° optical hue complement with perceptual luminance inversion:
+    * E.g. Magenta/pink element → Electric Emerald/Cyan highlight.
+    * E.g. Navy/blue element → Radiant Amber-Gold highlight.
+    * Achromatic light elements (white/gray) → Luminous Electric Magenta (`#FF0D8C`).
+    * Achromatic dark elements (black/charcoal) → Radiant Electric Cyan (`#00F2FF`).
+* **Stroke Prominence Over Unity RectTool [IMPLEMENTED]:**
+  * L-brackets boosted to an ultra-bold **3.5px thickness** with a **6.0px solid dark backing** (`alpha = 0.55f`) for commanding visual dominance over Unity's 1px RectTool wireframe.
+  * Centre crosshair kept sleek at **1.75px** with a **3.5px shadow pass**.
+* **Decoupled Grid Line vs. UI Element Snap Highlight [IMPLEMENTED]:**
+  * **UI Element Brackets:** Dynamically computed using the 180° optical complement of the UI element's `Graphic` color.
+  * **Grid Line Highlight:** Dynamically computed using the 180° optical complement of the grid's own `GridColor`, ensuring clean visual harmony along the grid line independent of the UI element.
 
 ---
 

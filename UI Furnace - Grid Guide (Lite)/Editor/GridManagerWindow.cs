@@ -375,6 +375,33 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 
 			card.Add(canvasRow);
 
+			// State 0: Multiple Canvases Selected
+			if (GridSettings.HasMultipleCanvasesSelected)
+			{
+				var multiWarning = new HelpBox($"Multiple Canvases Selected ({GridSettings.SelectedCanvases.Count} Canvases).\nChoose a single Canvas below to view and configure its grid profile:", HelpBoxMessageType.Warning);
+				card.Add(multiWarning);
+
+				var canvasButtonsContainer = new VisualElement { style = { flexDirection = FlexDirection.Row, flexWrap = Wrap.Wrap, marginTop = 6 } };
+				foreach (var c in GridSettings.SelectedCanvases)
+				{
+					if (c == null) continue;
+					var targetCanvas = c;
+					var selectBtn = new Button(() =>
+					{
+						Selection.activeGameObject = targetCanvas.gameObject;
+						GridSettings.SyncCanvasSelection(targetCanvas);
+					})
+					{
+						text = targetCanvas.gameObject.name,
+						tooltip = $"Click to focus and edit grid for '{targetCanvas.gameObject.name}'",
+						style = { height = 22, marginRight = 4, marginBottom = 4, paddingLeft = 8, paddingRight = 8 }
+					};
+					canvasButtonsContainer.Add(selectBtn);
+				}
+				card.Add(canvasButtonsContainer);
+				return card;
+			}
+
 			// State 1: No Canvas Selected
 			if (canvas == null)
 			{

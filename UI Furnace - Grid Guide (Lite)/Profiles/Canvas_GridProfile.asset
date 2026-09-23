@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d7139f429b82ce341b02008883aef1bc, type: 3}
   m_Name: Canvas_GridProfile
   m_EditorClassIdentifier: AZSoftStudio.UIFurnace.GridGuide.Runtime::AZSoftStudio.UIFurnace.GridGuide.GridProfile
-  GridColor: {r: 0.3, g: 0.7, b: 1, a: 0.25}
+  GridColor: {r: 0.3, g: 0.7, b: 1, a: 0.56078434}
   XAxisColor: {r: 1, g: 0.3, b: 0.3, a: 0.8}
   YAxisColor: {r: 0.3, g: 1, b: 0.3, a: 0.8}
   AxisThickness: 3
@@ -20,7 +20,7 @@ MonoBehaviour:
   GridOpacity: 1
   CurrentMode: 1
   CurrentSymmetryMode: 1
-  CurrentDynamicType: 1
+  CurrentDynamicType: 0
   GridSpacingX: 50
   GridSpacingY: 50
   GridColumns: 6
@@ -28,15 +28,20 @@ MonoBehaviour:
   DynamicStretchX:
   - 0.0778211
   - 0.18498492
-  - 0.6918982
+  - 0.9296597
   DynamicStretchY:
-  - 0.36629385
-  - 0.5
+  - 0.3973564
+  - 0.86582917
   - 0.75
-  - 0.63238573
-  DynamicFixedX: []
-  DynamicFixedY: []
+  DynamicFixedX:
+  - -434.4221
+  - -324.1505
+  - 442.11984
+  DynamicFixedY:
+  - -58.096283
+  - 207.05931
+  - 141.5
   SnapToElements: 1
   SnapElementsToGrid: 1
-  SnapDistance: 3.6
+  SnapDistance: 28.82
   ElementSnapDistance: 6.1

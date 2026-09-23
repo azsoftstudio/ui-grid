@@ -103,18 +103,34 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 		{
 			InvalidateCache();
 
-			var activeGO = Selection.activeGameObject;
-			if (activeGO != null)
+			var canvases = new List<Canvas>();
+			var seen = new HashSet<Canvas>();
+
+			foreach (var go in Selection.gameObjects)
 			{
-				var rt = activeGO.GetComponent<RectTransform>();
+				if (go == null) continue;
+				var rt = go.GetComponent<RectTransform>();
 				if (rt != null)
 				{
 					var can = rt.GetComponentInParent<Canvas>();
-					if (can != null && can.renderMode != RenderMode.WorldSpace)
+					if (can != null && can.renderMode != RenderMode.WorldSpace && seen.Add(can))
 					{
-						GridSettings.SyncCanvasSelection(can);
+						canvases.Add(can);
 					}
 				}
+			}
+
+			if (canvases.Count == 0)
+			{
+				GridSettings.SyncCanvasSelection(null);
+			}
+			else if (canvases.Count == 1)
+			{
+				GridSettings.SyncCanvasSelection(canvases[0]);
+			}
+			else
+			{
+				GridSettings.SyncMultipleCanvasesSelection(canvases);
 			}
 		}
 
@@ -469,6 +485,12 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 
 		private static bool TryGetCachedComponents(out RectTransform rectTransform, out Canvas canvas, out RectTransform canvasRect)
 		{
+			if (GridSettings.HasMultipleCanvasesSelected || GridSettings.ActiveCanvas == null)
+			{
+				rectTransform = null; canvas = null; canvasRect = null;
+				return false;
+			}
+
 			if (IsCacheValid())
 			{
 				rectTransform = s_CachedRectTransform;
@@ -541,16 +563,10 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 				s_HierarchyListBuffer.Clear();
 				s_CachedCanvasRect.GetComponentsInChildren<RectTransform>(false, s_HierarchyListBuffer);
 				
-				s_SelectionBuffer.Clear();
-				foreach (var go in Selection.gameObjects)
-				{
-					s_SelectionBuffer.Add(go);
-				}
-				
 				var validRTs = new List<RectTransform>(s_HierarchyListBuffer.Count);
 				for (int i = 0; i < s_HierarchyListBuffer.Count; i++)
 				{
-					if (s_HierarchyListBuffer[i] != null && !s_SelectionBuffer.Contains(s_HierarchyListBuffer[i].gameObject))
+					if (s_HierarchyListBuffer[i] != null)
 					{
 						validRTs.Add(s_HierarchyListBuffer[i]);
 					}
@@ -831,7 +847,7 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 						if (rect != null)
 						{
 							rect.GetWorldCorners(snapCorners);
-							DrawSnapHighlight(snapCorners);
+							DrawSnapHighlight(snapCorners, rect);
 						}
 					}
 				}
@@ -1279,15 +1295,18 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 			// Pass 3: Draw all unique snapped lines once
 			if (s_SnapHighlightedRects.Count > 0 && Event.current.type == EventType.Repaint)
 			{
-				Handles.color = new Color(1f, 0.08f, 0.9f, 0.8f);
+				Color snapLineColor = GetGridComplementColor();
+				snapLineColor.a = 0.95f;
+				Handles.color = snapLineColor;
+				float snapLineThickness = Mathf.Max(2.5f, GridSettings.GridThickness + 1.5f);
 				float halfW = canvasWidth * 0.5f;
 				float halfH = canvasHeight * 0.5f;
 
 				foreach (float gridX in s_HighlightOffsetsX)
-					DrawCrispLine(GridSettings.GridThickness, center + right * gridX - up * halfH, center + right * gridX + up * halfH);
+					DrawCrispLine(snapLineThickness, center + right * gridX - up * halfH, center + right * gridX + up * halfH);
 				
 				foreach (float gridY in s_HighlightOffsetsY)
-					DrawCrispLine(GridSettings.GridThickness, center + up * gridY - right * halfW, center + up * gridY + right * halfW);
+					DrawCrispLine(snapLineThickness, center + up * gridY - right * halfW, center + up * gridY + right * halfW);
 
 				if (SceneView.currentDrawingSceneView != null) SceneView.currentDrawingSceneView.Repaint();
 			}
@@ -1493,14 +1512,16 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 						if (s_AddingLineIsVertical)
 						{
 							float val = (ApplySnap(Vector3.Dot(mouseWorldPos - center, right), s_SnapWorldLinesX, s_SnapSourcesX) + halfWidth) / canvasWidth;
+							val = Mathf.Clamp01(val);
 							GridSettings.DynamicStretchX.Add(val);
-							if (GridSettings.IsMirrorModeActive) GridSettings.DynamicStretchX.Add(1f - val);
+							if (GridSettings.IsMirrorModeActive) GridSettings.DynamicStretchX.Add(Mathf.Clamp01(1f - val));
 						}
 						else
 						{
 							float val = (ApplySnap(Vector3.Dot(mouseWorldPos - center, up), s_SnapWorldLinesY, s_SnapSourcesY) + halfHeight) / canvasHeight;
+							val = Mathf.Clamp01(val);
 							GridSettings.DynamicStretchY.Add(val);
-							if (GridSettings.IsMirrorModeActive) GridSettings.DynamicStretchY.Add(1f - val);
+							if (GridSettings.IsMirrorModeActive) GridSettings.DynamicStretchY.Add(Mathf.Clamp01(1f - val));
 						}
 					}
 					
@@ -1656,14 +1677,16 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 						if (s_AxisDragIsVertical)
 						{
 							float val = (ApplySnap(Vector3.Dot(mouseWorldPos - center, right), s_SnapWorldLinesX, s_SnapSourcesX) + halfWidth) / canvasWidth;
+							val = Mathf.Clamp01(val);
 							GridSettings.DynamicStretchX.Add(val);
-							if (GridSettings.IsMirrorModeActive) GridSettings.DynamicStretchX.Add(1f - val);
+							if (GridSettings.IsMirrorModeActive) GridSettings.DynamicStretchX.Add(Mathf.Clamp01(1f - val));
 						}
 						else
 						{
 							float val = (ApplySnap(Vector3.Dot(mouseWorldPos - center, up), s_SnapWorldLinesY, s_SnapSourcesY) + halfHeight) / canvasHeight;
+							val = Mathf.Clamp01(val);
 							GridSettings.DynamicStretchY.Add(val);
-							if (GridSettings.IsMirrorModeActive) GridSettings.DynamicStretchY.Add(1f - val);
+							if (GridSettings.IsMirrorModeActive) GridSettings.DynamicStretchY.Add(Mathf.Clamp01(1f - val));
 						}
 					}
 
@@ -1912,14 +1935,16 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 						if (s_DragIndexX != -1) 
 						{
 							float val = (ApplySnap(Vector3.Dot(mouseWorldPos - center, right), s_SnapWorldLinesX, s_SnapSourcesX) + halfWidth) / canvasWidth;
+							val = Mathf.Clamp01(val);
 							GridSettings.DynamicStretchX[s_DragIndexX] = val;
-							if (s_MirrorDragIndexX != -1) GridSettings.DynamicStretchX[s_MirrorDragIndexX] = 1f - val;
+							if (s_MirrorDragIndexX != -1) GridSettings.DynamicStretchX[s_MirrorDragIndexX] = Mathf.Clamp01(1f - val);
 						}
 						if (s_DragIndexY != -1) 
 						{
 							float val = (ApplySnap(Vector3.Dot(mouseWorldPos - center, up), s_SnapWorldLinesY, s_SnapSourcesY) + halfHeight) / canvasHeight;
+							val = Mathf.Clamp01(val);
 							GridSettings.DynamicStretchY[s_DragIndexY] = val;
-							if (s_MirrorDragIndexY != -1) GridSettings.DynamicStretchY[s_MirrorDragIndexY] = 1f - val;
+							if (s_MirrorDragIndexY != -1) GridSettings.DynamicStretchY[s_MirrorDragIndexY] = Mathf.Clamp01(1f - val);
 						}
 					}
 
@@ -2072,7 +2097,7 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 		{
 			float px = GridSettings.CurrentDynamicType == DynamicGridType.FixedPosition
 				? rawOffset / (localSize > 0.001f ? (canvasSize / localSize) : 1f)
-				: (rawOffset - 0.5f) * localSize;   // stretch t -> pixels from center
+				: (Mathf.Clamp01(rawOffset) - 0.5f) * localSize;   // stretch t -> pixels from center
 			string sign = px >= 0 ? "+" : "";
 
 			DrawPositionBadge(mouseWorldPos, $"{axis}: {sign}{px:F0} px");
@@ -2278,12 +2303,78 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 		}
 
 		/// <summary>
+		/// Calculates a high-contrast complementary snap highlight color in real time based on the target element's Graphic color.
+		/// If low saturation or no graphic exists, gracefully selects radiant electric cyan or magenta for guaranteed contrast.
+		/// </summary>
+		private static Color GetAdaptiveSnapColor(RectTransform target)
+		{
+			Color baseColor = Color.clear;
+			if (target != null)
+			{
+				var graphic = target.GetComponent<UnityEngine.UI.Graphic>();
+				if (graphic != null && graphic.color.a > 0.05f)
+				{
+					baseColor = graphic.color;
+				}
+			}
+
+			if (baseColor.a <= 0.05f)
+			{
+				baseColor = GridSettings.GridColor;
+			}
+
+			Color.RGBToHSV(baseColor, out float h, out float s, out float v);
+
+			// For near-achromatic surfaces (pure white, grey, or black)
+			if (s < 0.2f)
+			{
+				// On dark backgrounds/elements, emit radiant electric cyan
+				if (v < 0.45f)
+					return new Color(0f, 0.95f, 1f, 1f);
+				// On light backgrounds/elements, emit hot electric magenta
+				return new Color(1f, 0.05f, 0.55f, 1f);
+			}
+
+			// Shift hue by 180 degrees for true optical complement
+			float compH = (h + 0.5f) % 1f;
+			float compS = Mathf.Clamp(Mathf.Max(s, 0.85f), 0.75f, 1f);
+			float compV = v < 0.5f ? 1.0f : 0.95f;
+
+			Color compColor = Color.HSVToRGB(compH, compS, compV);
+			compColor.a = 1f;
+			return compColor;
+		}
+
+		/// <summary>
+		/// Calculates a high-contrast complementary color derived strictly from the Grid's own GridColor.
+		/// Used for highlighting snapped grid lines independently of whatever color UI elements have.
+		/// </summary>
+		private static Color GetGridComplementColor()
+		{
+			Color gridBase = GridSettings.GridColor;
+			Color.RGBToHSV(gridBase, out float h, out float s, out float v);
+
+			if (s < 0.2f)
+			{
+				return v < 0.45f ? new Color(0f, 0.95f, 1f, 1f) : new Color(1f, 0.05f, 0.55f, 1f);
+			}
+
+			float compH = (h + 0.5f) % 1f;
+			float compS = Mathf.Clamp(Mathf.Max(s, 0.9f), 0.75f, 1f);
+			float compV = v < 0.5f ? 1.0f : 0.95f;
+
+			Color compColor = Color.HSVToRGB(compH, compS, compV);
+			compColor.a = 1f;
+			return compColor;
+		}
+
+		/// <summary>
 		/// Draws professional snap feedback: 4 corner L-brackets + a tight centre crosshair.
-		/// Uses a dark shadow pass then a bright icy-cyan pass so it's always visible
-		/// on any background colour (dark UI, bright UI, photos, etc.).
+		/// Uses a dark shadow pass then a bold real-time complementary pass so it's
+		/// always visible over Unity's 1px RectTool gizmo on any background colour.
 		/// corners[] must be GetWorldCorners order: 0=BL, 1=TL, 2=TR, 3=BR.
 		/// </summary>
-		private static void DrawSnapHighlight(Vector3[] c)
+		private static void DrawSnapHighlight(Vector3[] c, RectTransform target = null)
 		{
 			Vector3 rightDir = c[3] - c[0];
 			Vector3 upDir    = c[1] - c[0];
@@ -2300,44 +2391,50 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 			float crossLen = shorter * 0.10f;
 			Vector3 ctr    = (c[0] + c[2]) * 0.5f;
 
-			Color shadow = new Color(0f, 0f, 0f, 0.2f);     // very subtle â€” don't drag brightness down
-			Color bright = new Color(1f, 0.08f, 0.9f, 1f);  // blazing hot pink
+			Color shadow = new Color(0f, 0f, 0f, 0.55f);     // solid dark backing for razor-sharp edge contrast
+			Color bright = GetAdaptiveSnapColor(target);      // real-time complementary color for the UI element
 
-			// â”€â”€ Shadow pass (4px) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+			// Boosted L-bracket thickness to give it strong visual dominance over Unity's 1px wireframe
+			float bracketShadowThickness = 6.0f;
+			float bracketBrightThickness = 3.5f; 
+			float crossShadowThickness   = 3.5f;
+			float crossBrightThickness   = 1.75f;
+
+			// ─── Shadow pass ─────────────────────────────────────────────────────────
 			Handles.color = shadow;
 			// BL corner
-			DrawCrispLineScreenSpace(2f, c[0], c[0] + right * armLen);
-			DrawCrispLineScreenSpace(2f, c[0], c[0] + up    * armLen);
+			DrawCrispLineScreenSpace(bracketShadowThickness, c[0], c[0] + right * armLen);
+			DrawCrispLineScreenSpace(bracketShadowThickness, c[0], c[0] + up    * armLen);
 			// TL corner
-			DrawCrispLineScreenSpace(2f, c[1], c[1] + right * armLen);
-			DrawCrispLineScreenSpace(2f, c[1], c[1] - up    * armLen);
+			DrawCrispLineScreenSpace(bracketShadowThickness, c[1], c[1] + right * armLen);
+			DrawCrispLineScreenSpace(bracketShadowThickness, c[1], c[1] - up    * armLen);
 			// TR corner
-			DrawCrispLineScreenSpace(2f, c[2], c[2] - right * armLen);
-			DrawCrispLineScreenSpace(2f, c[2], c[2] - up    * armLen);
+			DrawCrispLineScreenSpace(bracketShadowThickness, c[2], c[2] - right * armLen);
+			DrawCrispLineScreenSpace(bracketShadowThickness, c[2], c[2] - up    * armLen);
 			// BR corner
-			DrawCrispLineScreenSpace(2f, c[3], c[3] - right * armLen);
-			DrawCrispLineScreenSpace(2f, c[3], c[3] + up    * armLen);
+			DrawCrispLineScreenSpace(bracketShadowThickness, c[3], c[3] - right * armLen);
+			DrawCrispLineScreenSpace(bracketShadowThickness, c[3], c[3] + up    * armLen);
 			// Centre crosshair
-			DrawCrispLineScreenSpace(2f, ctr - right * crossLen, ctr + right * crossLen);
-			DrawCrispLineScreenSpace(2f, ctr - up    * crossLen, ctr + up    * crossLen);
+			DrawCrispLineScreenSpace(crossShadowThickness, ctr - right * crossLen, ctr + right * crossLen);
+			DrawCrispLineScreenSpace(crossShadowThickness, ctr - up    * crossLen, ctr + up    * crossLen);
 
-			// â”€â”€ Bright pass (2px) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+			// ─── Bright pass ─────────────────────────────────────────────────────────
 			Handles.color = bright;
 			// BL corner
-			DrawCrispLineScreenSpace(1f, c[0], c[0] + right * armLen);
-			DrawCrispLineScreenSpace(1f, c[0], c[0] + up    * armLen);
+			DrawCrispLineScreenSpace(bracketBrightThickness, c[0], c[0] + right * armLen);
+			DrawCrispLineScreenSpace(bracketBrightThickness, c[0], c[0] + up    * armLen);
 			// TL corner
-			DrawCrispLineScreenSpace(1f, c[1], c[1] + right * armLen);
-			DrawCrispLineScreenSpace(1f, c[1], c[1] - up    * armLen);
+			DrawCrispLineScreenSpace(bracketBrightThickness, c[1], c[1] + right * armLen);
+			DrawCrispLineScreenSpace(bracketBrightThickness, c[1], c[1] - up    * armLen);
 			// TR corner
-			DrawCrispLineScreenSpace(1f, c[2], c[2] - right * armLen);
-			DrawCrispLineScreenSpace(1f, c[2], c[2] - up    * armLen);
+			DrawCrispLineScreenSpace(bracketBrightThickness, c[2], c[2] - right * armLen);
+			DrawCrispLineScreenSpace(bracketBrightThickness, c[2], c[2] - up    * armLen);
 			// BR corner
-			DrawCrispLineScreenSpace(1f, c[3], c[3] - right * armLen);
-			DrawCrispLineScreenSpace(1f, c[3], c[3] + up    * armLen);
+			DrawCrispLineScreenSpace(bracketBrightThickness, c[3], c[3] - right * armLen);
+			DrawCrispLineScreenSpace(bracketBrightThickness, c[3], c[3] + up    * armLen);
 			// Centre crosshair
-			DrawCrispLineScreenSpace(1f, ctr - right * crossLen, ctr + right * crossLen);
-			DrawCrispLineScreenSpace(1f, ctr - up    * crossLen, ctr + up    * crossLen);
+			DrawCrispLineScreenSpace(crossBrightThickness, ctr - right * crossLen, ctr + right * crossLen);
+			DrawCrispLineScreenSpace(crossBrightThickness, ctr - up    * crossLen, ctr + up    * crossLen);
 		}
 
 

@@ -18,6 +18,8 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 		public static Canvas ActiveCanvas { get; set; }
 		public static GridCanvasLink ActiveLink => ActiveCanvas != null ? ActiveCanvas.GetComponent<GridCanvasLink>() : null;
 		public static GridProfile ActiveProfile { get; set; }
+		public static List<Canvas> SelectedCanvases { get; set; } = new List<Canvas>();
+		public static bool HasMultipleCanvasesSelected => SelectedCanvases != null && SelectedCanvases.Count > 1;
 
 		// ─── Runtime cache (read every frame by GridRenderer) ──────────────────
 		public static Color         GridColor           { get; set; } = new Color(0.3f, 0.7f, 1f,   0.25f);
@@ -204,6 +206,10 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 		/// </summary>
 		public static void SyncCanvasSelection(Canvas canvas)
 		{
+			SelectedCanvases.Clear();
+			if (canvas != null)
+				SelectedCanvases.Add(canvas);
+
 			var link = canvas != null ? canvas.GetComponent<GridCanvasLink>() : null;
 			var prof = link != null ? link.Profile : null;
 
@@ -211,6 +217,25 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 
 			ActiveCanvas = canvas;
 			ActiveProfile = prof;
+
+			LoadCurrentSettings();
+			SceneView.RepaintAll();
+
+			foreach (var win in Resources.FindObjectsOfTypeAll<GridManagerWindow>())
+			{
+				win.CreateGUI();
+			}
+		}
+
+		/// <summary>
+		/// Handles multi-selection when 2 or more Canvases are selected in the Hierarchy.
+		/// Clears active canvas and profile so settings don't cross-contaminate, and updates open windows.
+		/// </summary>
+		public static void SyncMultipleCanvasesSelection(List<Canvas> canvases)
+		{
+			SelectedCanvases = canvases != null ? new List<Canvas>(canvases) : new List<Canvas>();
+			ActiveCanvas = null;
+			ActiveProfile = null;
 
 			LoadCurrentSettings();
 			SceneView.RepaintAll();
@@ -398,9 +423,19 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 			else if (CurrentDynamicType == DynamicGridType.FixedPosition && type == DynamicGridType.StretchWithCanvas)
 			{
 				DynamicStretchX.Clear();
-				foreach (var p in DynamicFixedX) DynamicStretchX.Add((p / canvasWidth) + 0.5f);
+				foreach (var p in DynamicFixedX)
+				{
+					float t = (p / canvasWidth) + 0.5f;
+					if (t >= -0.01f && t <= 1.01f)
+						DynamicStretchX.Add(Mathf.Clamp01(t));
+				}
 				DynamicStretchY.Clear();
-				foreach (var p in DynamicFixedY) DynamicStretchY.Add((p / canvasHeight) + 0.5f);
+				foreach (var p in DynamicFixedY)
+				{
+					float t = (p / canvasHeight) + 0.5f;
+					if (t >= -0.01f && t <= 1.01f)
+						DynamicStretchY.Add(Mathf.Clamp01(t));
+				}
 			}
 
 			CurrentDynamicType = type;
