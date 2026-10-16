@@ -65,26 +65,27 @@ This document outlines the complete plan for **Visual Feedback enhancements** (C
 
 ---
 
-### 4. Modern In-Scene HUD Toolbar
-* **Sleek Floating Panel:**
-  * Replace the legacy gray OS window (`GUI.skin.window`) with a dark, rounded glassmorphic toolbar matching the Position Badge aesthetic (`#1F1F24` with drop shadow and border).
-* **Interactive Quick-Action Buttons:**
-  * Provide one-click Scene View toggles so users don't need to return to the Inspector window:
-    * 🧲 **Snap to UI Elements** toggle
-    * 📐 **Snap Elements to Grid** toggle
-    * 🪞 **Mirror Mode** toggle
-    * ➕ **Add H-Line / V-Line** quick-creation buttons
-    * 🗑️ **Delete Selected** button (active when lines are selected)
-    * ✕ **Exit Edit Mode** button
+### 4. Modern In-Scene HUD Toolbar [IMPLEMENTED]
+* **Native Dual-Bar Floating Overlay:**
+  * Replaced the legacy gray OS window (`GUI.skin.window`) with a native Unity-styled dark/light adaptive dual-bar floating panel (`EditorStyles.toolbarButton` and theme-aware styling).
+  * **Bar 1 (Header):** Drag grip (`⠿`), active status LED (`●`), title, minimize toggle (`—`/`▸`), and quick-exit (`✕`).
+  * **Bar 2 (Controls Toolbar):**
+    * 🧲 **Snap** toggle (magnetic snapping to child UI elements)
+    * 🪞 **Mirror** toggle (symmetric guide placement)
+    * ➕ **+H / +V** buttons (one-click center guide insertion)
+    * 🗑️ **Delete Selected** button with dynamic selection count badge `🗑️ (N)`
 * **Collapse / Minimize State:**
-  * A compact pill button to tuck the HUD away into a mini status badge when full scene visibility is needed.
+  * One-click toggle between full toolbar and a compact 24px micro-pill `[ ⠿ ● UI Furnace ▸ ✕ ]` to ensure zero scene clutter.
+* **Persistent Screen Placement:**
+  * Clamped to SceneView bounds and persisted across sessions via `EditorPrefs`.
 
 ---
 
 ### 5. Canvas Edge Rulers & Guide Pull-Tabs
-* **Edge Pull-Tabs (Photoshop / Illustrator Style):**
-  * Subtle draggable tabs or tick marks on the canvas borders.
-  * In "Add Lines Mode", designers can drag directly from the canvas edge into the layout to pull out a new horizontal or vertical guide.
+* **Detailed Specification:** See [Canvas_Edge_Ruler_Specification.md](Canvas_Edge_Ruler_Specification.md) for full commercial analysis, feature hooks, and rendering architecture.
+* **Edge Pull Rails (Photoshop / Illustrator Style) [IMPLEMENTED]:**
+  * Sleek border rails on the 4 canvas boundaries with hover highlights, native diamond notch, and dynamic cursor switching.
+  * In "Pull Guides from Edges", designers click and drag directly from the canvas edge into the layout to pull out a new horizontal or vertical guide.
 * **Canvas Origin Crosshair:**
   * Clearly demarcate the (0,0) canvas origin with subtle tick marks and coordinate readouts.
 

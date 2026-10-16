@@ -52,12 +52,14 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 		private static bool s_AddingLineIsVertical = false;
 
 		// â”€â”€â”€ Add Lines Mode (Drag from Axis) State â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-		/// <summary>When true, users can drag from the X/Y axis to create a new grid line.</summary>
+		/// <summary>When true, users can drag from the canvas edges to pull out a new horizontal/vertical guide.</summary>
 		public static bool IsAddLinesMode { get; set; } = false;
 		private static bool s_IsAxisDragging = false;     // True while mid-drag creating a new line
-		private static bool s_AxisDragIsVertical = false; // Which axis is being dragged
-		private static bool s_HoverAxisX = false;         // Mouse hovering near X axis (horizontal)
-		private static bool s_HoverAxisY = false;         // Mouse hovering near Y axis (vertical)
+		private static bool s_AxisDragIsVertical = false; // Which guide orientation is being pulled (true = vertical, false = horizontal)
+		private static bool s_HoverEdgeH = false;         // Mouse hovering near horizontal pull edges (Top or Bottom)
+		private static bool s_HoverEdgeV = false;         // Mouse hovering near vertical pull edges (Left or Right)
+		private static bool s_HoverEdgeTop = false;       // Specifically top edge
+		private static bool s_HoverEdgeLeft = false;      // Specifically left edge
 
 		// â”€â”€â”€ Selection State (Transient) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 		public static readonly List<int> SelectedIndicesX = new List<int>();
@@ -69,8 +71,10 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 		// Maps each snap line entry index to the source RectTransform â€” same order as snap lists above
 		private static readonly List<RectTransform> s_SnapSourcesX = new List<RectTransform>();
 		private static readonly List<RectTransform> s_SnapSourcesY = new List<RectTransform>();
-		// The elements whose borders are currently being snapped to (for highlight drawing)
+		// The elements whose borders are currently being snapped to (for highlight drawing when dragging grid lines)
 		private static readonly List<RectTransform> s_SnapHighlightedRects = new List<RectTransform>();
+		// Elements snapped while dragging UI elements with Unity's Rect Tool
+		private static readonly List<RectTransform> s_ElementSnapHighlightedRects = new List<RectTransform>();
 		// The specific grid line offsets that should be highlighted (relative to canvas center)
 		private static readonly HashSet<float> s_HighlightOffsetsX = new HashSet<float>();
 		private static readonly HashSet<float> s_HighlightOffsetsY = new HashSet<float>();
@@ -180,6 +184,11 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 
 		private static void ProcessElementSnapping()
 		{
+			if (s_IsDragging || s_IsAxisDragging || s_IsAddingLine) return;
+			if (GUIUtility.hotControl == 0)
+			{
+				s_CurrentDragMode = DragMode.None;
+			}
 			if (!GridSettings.SnapElementsToGrid) return;
 			if (GridSettings.ActiveProfile == null) return;
 			if (Tools.current != Tool.Rect) return;
@@ -684,11 +693,12 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 			// Second pass: Highlight ALL elements that align with our snapped position
 			if (minDistance <= worldSnapDist)
 			{
+				float highlightTolerance = Mathf.Max(tolerance, 0.001f);
 				for (int i = 0; i < snapLines.Count; i++)
 				{
-					if (Mathf.Abs(snapLines[i] - bestSnap) < tolerance)
+					if (Mathf.Abs(snapLines[i] - bestSnap) <= highlightTolerance)
 					{
-						if (!s_SnapHighlightedRects.Contains(snapSources[i]))
+						if (snapSources[i] != null && !s_SnapHighlightedRects.Contains(snapSources[i]))
 							s_SnapHighlightedRects.Add(snapSources[i]);
 					}
 				}
@@ -779,6 +789,7 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 			}
 
 			s_SnapHighlightedRects.Clear();
+			s_ElementSnapHighlightedRects.Clear();
 			s_HighlightOffsetsX.Clear();
 			s_HighlightOffsetsY.Clear();
 			s_PendingBadgeText = null;
@@ -838,11 +849,25 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 
 				HandleElementSnapping(center, right, up, canvasWidth, canvasHeight, scaleX, scaleY);
 
-				// Draw snap highlight LAST so it always renders on top of all grid lines.
+				// Draw snap highlight for UI elements when a grid line snaps to them
 				if (Event.current.type == EventType.Repaint && s_SnapHighlightedRects.Count > 0)
 				{
 					var snapCorners = new Vector3[4];
 					foreach (var rect in s_SnapHighlightedRects)
+					{
+						if (rect != null)
+						{
+							rect.GetWorldCorners(snapCorners);
+							DrawSnapHighlight(snapCorners, rect);
+						}
+					}
+				}
+
+				// Draw snap highlight for UI elements when they snap to grid lines while dragging the element
+				if (Event.current.type == EventType.Repaint && s_ElementSnapHighlightedRects.Count > 0 && s_CurrentDragMode != DragMode.None)
+				{
+					var snapCorners = new Vector3[4];
+					foreach (var rect in s_ElementSnapHighlightedRects)
 					{
 						if (rect != null)
 						{
@@ -865,36 +890,7 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 			}
 		}
 
-		// â”€â”€â”€ Shortcuts â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-		/// <summary>
-		/// Toggle grid visibility. Default: Alt+G.
-		/// Rebind via Edit â†’ Shortcuts â†’ "UI Furnace/Toggle Grid".
-		/// </summary>
-		[Shortcut("UI Furnace/Toggle Grid", KeyCode.G, ShortcutModifiers.Alt)]
-		private static void ToggleGridShortcut() => ToggleGrid();
-
-		[Shortcut("UI Furnace/Toggle Edit Mode", KeyCode.E, ShortcutModifiers.Alt)]
-		private static void ToggleEditModeShortcut() => ToggleEditMode();
-
-		[Shortcut("UI Furnace/Toggle Snap Lines to UI", KeyCode.S, ShortcutModifiers.Alt)]
-		private static void ToggleSnapLinesToUIShortcut() => ToggleSnapLinesToUI();
-
-		[Shortcut("UI Furnace/Toggle Mirror Mode", KeyCode.M, ShortcutModifiers.Alt)]
-		private static void ToggleMirrorModeShortcut() => ToggleMirrorMode();
-
-		[Shortcut("UI Furnace/Toggle Snap Elements to Grid", KeyCode.S, ShortcutModifiers.Alt | ShortcutModifiers.Shift)]
-		private static void ToggleSnapElementsToGridShortcut() => ToggleSnapElementsToGrid();
-
-		[Shortcut("UI Furnace/Delete Selected Lines", KeyCode.Backspace, ShortcutModifiers.Alt)]
-		private static void DeleteSelectedLinesShortcut() => DeleteSelectedLines();
-
-		[Shortcut("UI Furnace/Add Horizontal Line", KeyCode.H, ShortcutModifiers.Alt)]
-		private static void AddHorizontalLineShortcut() => StartAddingHorizontalLine();
-
-		[Shortcut("UI Furnace/Add Vertical Line", KeyCode.V, ShortcutModifiers.Alt)]
-		private static void AddVerticalLineShortcut() => StartAddingVerticalLine();
-
-		// â”€â”€â”€ Drawing â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+		// ─── Drawing ──────────────────────────────────────────────────────────
 		/// <summary>Apply global opacity (Suggestion 6) to a color.</summary>
 		private static Color WithOpacity(Color color)
 		{
@@ -902,10 +898,25 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 			return color;
 		}
 
-		private static Rect s_HUDRect = new Rect(20, 20, 220, 60);
+		private static Rect s_HUDRect = new Rect(20, 20, 310, 52);
 		private static bool s_HUDInitialized = false;
+		private static bool s_HUDCollapsed = false;
+		private static GUIStyle s_HUDWindowStyle;
+		private static GUIStyle HUDWindowStyle
+		{
+			get
+			{
+				if (s_HUDWindowStyle == null)
+				{
+					s_HUDWindowStyle = new GUIStyle();
+					s_HUDWindowStyle.padding = new RectOffset(6, 6, 4, 6);
+					s_HUDWindowStyle.border = new RectOffset(0, 0, 0, 0);
+				}
+				return s_HUDWindowStyle;
+			}
+		}
 
-		// #7 â€” Scene View HUD banner
+		// #7 — Modern In-Scene Dual-Bar HUD
 		private static void DrawEditModeHUD()
 		{
 			SceneView sv = SceneView.currentDrawingSceneView;
@@ -915,58 +926,147 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 
 			if (!s_HUDInitialized)
 			{
-				// Default to bottom-left corner
-				s_HUDRect.y = sv.position.height - 110f;
-				s_HUDRect.x = 20f;
+				s_HUDCollapsed = EditorPrefs.GetBool("UIFurnace_HUD_Collapsed", false);
+				float defaultX = EditorPrefs.GetFloat("UIFurnace_HUD_X", 20f);
+				float defaultY = EditorPrefs.GetFloat("UIFurnace_HUD_Y", sv.position.height - 85f);
+
+				s_HUDRect.x = defaultX;
+				s_HUDRect.y = defaultY;
 				s_HUDInitialized = true;
 			}
+
+			float targetWidth = s_HUDCollapsed ? 180f : 325f;
+			float targetHeight = s_HUDCollapsed ? 26f : 54f;
+			s_HUDRect.width = targetWidth;
+			s_HUDRect.height = targetHeight;
 
 			// Keep window on screen
 			s_HUDRect.x = Mathf.Clamp(s_HUDRect.x, 0, Mathf.Max(0, sv.position.width - s_HUDRect.width));
 			s_HUDRect.y = Mathf.Clamp(s_HUDRect.y, 0, Mathf.Max(0, sv.position.height - s_HUDRect.height));
 
 			int controlID = GUIUtility.GetControlID("UIFurnaceHUD".GetHashCode(), FocusType.Passive);
-			s_HUDRect = GUILayout.Window(controlID, s_HUDRect, HUDWindowContent, "UI Furnace", GUI.skin.window);
+			s_HUDRect = GUILayout.Window(controlID, s_HUDRect, HUDWindowContent, GUIContent.none, HUDWindowStyle);
+
+			if (Event.current.type == EventType.MouseUp)
+			{
+				EditorPrefs.SetFloat("UIFurnace_HUD_X", s_HUDRect.x);
+				EditorPrefs.SetFloat("UIFurnace_HUD_Y", s_HUDRect.y);
+			}
 
 			Handles.EndGUI();
 		}
 
 		private static void HUDWindowContent(int id)
 		{
-			var labelStyle = new GUIStyle(EditorStyles.label) { fontSize = 11, alignment = TextAnchor.MiddleLeft };
-			var boldStyle = new GUIStyle(labelStyle) { fontStyle = FontStyle.Bold };
-			var metaStyle = new GUIStyle(EditorStyles.miniLabel) { alignment = TextAnchor.MiddleRight, padding = new RectOffset(0,0,2,0) };
+			Rect totalRect = new Rect(0, 0, s_HUDRect.width, s_HUDRect.height);
 
-			Color activeColor = new Color(0.2f, 0.75f, 0.35f, 1f); // Professional "Active" green
+			// 1. Drop shadow for depth
+			EditorGUI.DrawRect(new Rect(totalRect.x + 1f, totalRect.y + 1f, totalRect.width, totalRect.height), new Color(0f, 0f, 0f, 0.45f));
 
+			// 2. Solid native panel background (adapts to Unity dark/light theme)
+			Color panelBg = EditorGUIUtility.isProSkin
+				? new Color(0.18f, 0.18f, 0.21f, 0.96f)
+				: new Color(0.85f, 0.85f, 0.88f, 0.96f);
+			EditorGUI.DrawRect(totalRect, panelBg);
+
+			// 3. Crisp border
+			Color borderColor = EditorGUIUtility.isProSkin
+				? new Color(0.12f, 0.12f, 0.14f, 0.9f)
+				: new Color(0.55f, 0.55f, 0.6f, 0.9f);
+			DrawBadgeBorder(totalRect, 1f, borderColor);
+
+			// --- BAR 1: Header / Title Bar ---
 			GUILayout.BeginHorizontal();
-			var defaultColor = GUI.color;
-			GUI.color = activeColor;
-			GUILayout.Label("â—", boldStyle, GUILayout.Width(14));
-			GUI.color = defaultColor;
-			GUILayout.Label("Grid Editing Active", boldStyle);
-			GUILayout.FlexibleSpace();
-			GUILayout.Label("(Alt+E)", metaStyle);
-			GUILayout.EndHorizontal();
 
-			if (GridSettings.IsMirrorModeActive)
+			// Grip icon
+			GUILayout.Label(new GUIContent("⠿", "Drag to reposition toolbar"), EditorStyles.miniLabel, GUILayout.Width(14));
+
+			// Green LED Status Dot
+			var defColor = GUI.color;
+			GUI.color = new Color(0.2f, 0.85f, 0.4f, 1f);
+			GUILayout.Label("●", EditorStyles.boldLabel, GUILayout.Width(12));
+			GUI.color = defColor;
+
+			// Title Label
+			GUILayout.Label(s_HUDCollapsed ? "UI Furnace" : "UI Furnace (Edit)", EditorStyles.boldLabel);
+			GUILayout.FlexibleSpace();
+
+			// Collapse / Expand Button
+			string collapseIcon = s_HUDCollapsed ? "▸" : "—";
+			string collapseTooltip = s_HUDCollapsed ? "Expand Toolbar" : "Minimize Toolbar";
+			if (GUILayout.Button(new GUIContent(collapseIcon, collapseTooltip), EditorStyles.toolbarButton, GUILayout.Width(22), GUILayout.Height(18)))
 			{
-				GUILayout.Space(4);
-				GUILayout.BeginHorizontal();
-				GUI.color = activeColor;
-				GUILayout.Label("â—", boldStyle, GUILayout.Width(14));
-				GUI.color = defaultColor;
-				GUILayout.Label("Mirror Mode", labelStyle);
-				GUILayout.FlexibleSpace();
-				GUILayout.Label("(Alt+M)", metaStyle);
-				GUILayout.EndHorizontal();
+				s_HUDCollapsed = !s_HUDCollapsed;
+				EditorPrefs.SetBool("UIFurnace_HUD_Collapsed", s_HUDCollapsed);
+				if (SceneView.currentDrawingSceneView != null) SceneView.currentDrawingSceneView.Repaint();
 			}
 
-			// Make the entire window area draggable
-			GUI.DragWindow(new Rect(0, 0, 10000, 10000));
+			// Explicit Exit Button
+			if (GUILayout.Button(new GUIContent("Exit", "Exit Edit Mode"), EditorStyles.toolbarButton, GUILayout.Width(34), GUILayout.Height(18)))
+			{
+				ExitEditMode();
+			}
+
+			GUILayout.EndHorizontal();
+
+			// Drag region for Bar 1 (leaves minimize and exit buttons responsive)
+			GUI.DragWindow(new Rect(0, 0, totalRect.width - 62f, 22f));
+
+			if (s_HUDCollapsed) return;
+
+			// --- Divider ---
+			GUILayout.Space(2);
+			Rect divRect = GUILayoutUtility.GetRect(totalRect.width - 12f, 1f);
+			EditorGUI.DrawRect(divRect, new Color(0.5f, 0.5f, 0.5f, 0.25f));
+			GUILayout.Space(2);
+
+			// --- BAR 2: Toolbar Controls ---
+			GUILayout.BeginHorizontal();
+
+			// 1. Snap Toggle
+			bool curSnap = GridSettings.SnapToElements;
+			bool newSnap = GUILayout.Toggle(curSnap, new GUIContent("Snap", "Toggle magnetic snapping to UI Elements"), EditorStyles.toolbarButton, GUILayout.Height(20));
+			if (newSnap != curSnap)
+			{
+				GridSettings.SaveSnapSettings(newSnap, GridSettings.SnapElementsToGrid, GridSettings.SnapDistance, GridSettings.ElementSnapDistance);
+				SceneView.RepaintAll();
+			}
+
+			// 2. Mirror Toggle
+			bool curMirror = GridSettings.IsMirrorModeActive;
+			bool newMirror = GUILayout.Toggle(curMirror, new GUIContent("Mirror", "Toggle symmetric guide mirroring"), EditorStyles.toolbarButton, GUILayout.Height(20));
+			if (newMirror != curMirror)
+			{
+				GridSettings.IsMirrorModeActive = newMirror;
+				SceneView.RepaintAll();
+			}
+
+			// 3. Add Horizontal Guide (Enters interactive guide placement mode)
+			if (GUILayout.Button(new GUIContent("+ H Line", "Enter interactive placement mode for a horizontal guide"), EditorStyles.toolbarButton, GUILayout.Height(20)))
+			{
+				StartAddingHorizontalLine();
+			}
+
+			// 4. Add Vertical Guide (Enters interactive guide placement mode)
+			if (GUILayout.Button(new GUIContent("+ V Line", "Enter interactive placement mode for a vertical guide"), EditorStyles.toolbarButton, GUILayout.Height(20)))
+			{
+				StartAddingVerticalLine();
+			}
+
+			// 5. Delete Selected Guides
+			int selCount = SelectedIndicesX.Count + SelectedIndicesY.Count;
+			bool hasSelection = selCount > 0;
+			GUI.enabled = hasSelection;
+			string delLabel = hasSelection ? $"Delete ({selCount})" : "Delete";
+			if (GUILayout.Button(new GUIContent(delLabel, "Delete Selected Guides (Del)"), EditorStyles.toolbarButton, GUILayout.Height(20)))
+			{
+				DeleteSelectedLines();
+			}
+			GUI.enabled = true;
+
+			GUILayout.EndHorizontal();
 		}
 
-		/// <summary>Draw grid with fixed world-space spacing.</summary>
 		private static void DrawFixedSpacingGrid(Vector3 BL, Vector3 TL, Vector3 TR, Vector3 BR, float localWidth, float localHeight)
 		{
 			float spacingX     = GridSettings.GridSpacingX;
@@ -1065,6 +1165,8 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 		private static void HandleElementSnapping(Vector3 center, Vector3 right, Vector3 up, float canvasWidth, float canvasHeight, float scaleX, float scaleY)
 		{
 			if (!GridSettings.SnapElementsToGrid) return;
+			// If user is currently dragging, axis-dragging, or adding a grid line, element-to-grid snapping must NOT run!
+			if (s_IsDragging || s_IsAxisDragging || s_IsAddingLine) return;
 			// Ensure user is actually using the Rect Tool
 			if (Tools.current != Tool.Rect) return;
 
@@ -1075,6 +1177,9 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 				s_CurrentDragMode = DragMode.None;
 				return;
 			}
+
+			// Must be an active element drag/resize (not stationary or another tool's hotControl)
+			if (s_CurrentDragMode == DragMode.None) return;
 
 			if (s_CurrentDragMode == DragMode.Resize && (s_IsShiftDown || s_IsAltDown))
 				return;
@@ -1224,7 +1329,7 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 			// Pass 2: Collect highlights using the global offsets
 			s_HighlightOffsetsX.Clear();
 			s_HighlightOffsetsY.Clear();
-			s_SnapHighlightedRects.Clear();
+			s_ElementSnapHighlightedRects.Clear();
 
 			if (globalSnappedX || globalSnappedY)
 			{
@@ -1286,14 +1391,13 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 
 					if (matchedForThisRect)
 					{
-						// Add dummy just for count check
-						s_SnapHighlightedRects.Add(rt);
+						s_ElementSnapHighlightedRects.Add(rt);
 					}
 				}
 			}
 
 			// Pass 3: Draw all unique snapped lines once
-			if (s_SnapHighlightedRects.Count > 0 && Event.current.type == EventType.Repaint)
+			if ((s_HighlightOffsetsX.Count > 0 || s_HighlightOffsetsY.Count > 0) && Event.current.type == EventType.Repaint)
 			{
 				Color snapLineColor = GetGridComplementColor();
 				snapLineColor.a = 0.95f;
@@ -1403,19 +1507,30 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 			if (e.type == EventType.ContextClick || (e.type == EventType.MouseUp && e.button == 1))
 			{
 				GenericMenu menu = new GenericMenu();
-				menu.AddItem(new GUIContent("[Grid] Add Horizontal Line\tAlt+H"), false, StartAddingHorizontalLine);
-				menu.AddItem(new GUIContent("[Grid] Add Vertical Line\tAlt+V"), false, StartAddingVerticalLine);
+				menu.AddItem(new GUIContent("Add Horizontal Line"), false, StartAddingHorizontalLine);
+				menu.AddItem(new GUIContent("Add Vertical Line"), false, StartAddingVerticalLine);
 				menu.AddSeparator("");
 				if (SelectedIndicesX.Count > 0 || SelectedIndicesY.Count > 0)
-					menu.AddItem(new GUIContent("[Grid] Delete Selected Lines\tAlt+Backspace"), false, DeleteSelectedLines);
+					menu.AddItem(new GUIContent("Delete Selected Lines\tDel"), false, DeleteSelectedLines);
 				else
-					menu.AddDisabledItem(new GUIContent("[Grid] Delete Selected Lines\tAlt+Backspace"));
+					menu.AddDisabledItem(new GUIContent("Delete Selected Lines\tDel"));
 				
 				menu.AddSeparator("");
-				menu.AddItem(new GUIContent("[Grid] Exit Edit Mode"), false, ExitEditMode);
+				menu.AddItem(new GUIContent("Exit Edit Mode"), false, ExitEditMode);
 				
 				menu.ShowAsContext();
 				e.Use();
+			}
+
+			// Key events in Scene View for grid editing: Delete / Backspace removes selected lines
+			if (e.type == EventType.KeyDown && (e.keyCode == KeyCode.Delete || e.keyCode == KeyCode.Backspace))
+			{
+				if (SelectedIndicesX.Count > 0 || SelectedIndicesY.Count > 0)
+				{
+					DeleteSelectedLines();
+					e.Use();
+					return;
+				}
 			}
 
 			// Add Line Preview Mode override
@@ -1440,6 +1555,9 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 					Handles.color = dragColor;
 
 					// Visually lock the preview line to the actual grid axis just like a real grid line
+					if (s_SnapWorldLinesX.Count == 0 && s_SnapWorldLinesY.Count == 0)
+						PrepareSnapLines(center, right, up);
+
 					if (s_AddingLineIsVertical)
 					{
 						float rawProj = Vector3.Dot(mouseWorldPos - center, right);
@@ -1542,43 +1660,61 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 			// â”€â”€â”€ Add Lines Mode: Drag from Axis to Create New Line â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 			if (IsAddLinesMode && !s_IsAxisDragging)
 			{
-				// Detect proximity to the X axis (horizontal line at center Y)
-				float distToXAxis = HandleUtility.DistanceToLine(center - right * halfWidth, center + right * halfWidth);
-				// Detect proximity to the Y axis (vertical line at center X)
-				float distToYAxis = HandleUtility.DistanceToLine(center - up * halfHeight, center + up * halfHeight);
+				float distTop    = HandleUtility.DistanceToLine(TL, TR);
+				float distBottom = HandleUtility.DistanceToLine(BL, BR);
+				float distLeft   = HandleUtility.DistanceToLine(BL, TL);
+				float distRight  = HandleUtility.DistanceToLine(BR, TR);
 
-				float axisThreshold = grabThreshold * 1.5f; // Slightly wider grab zone for axes
-				bool prevHoverAxisX = s_HoverAxisX;
-				bool prevHoverAxisY = s_HoverAxisY;
-				s_HoverAxisX = distToXAxis < axisThreshold;
-				s_HoverAxisY = distToYAxis < axisThreshold && !s_HoverAxisX;
+				float minDistH = Mathf.Min(distTop, distBottom);
+				float minDistV = Mathf.Min(distLeft, distRight);
 
-				if (prevHoverAxisX != s_HoverAxisX || prevHoverAxisY != s_HoverAxisY)
+				float edgeThreshold = grabThreshold * 1.6f;
+
+				bool prevHoverH = s_HoverEdgeH;
+				bool prevHoverV = s_HoverEdgeV;
+
+				if (minDistH < edgeThreshold && minDistH <= minDistV)
+				{
+					s_HoverEdgeH = true;
+					s_HoverEdgeV = false;
+					s_HoverEdgeTop = distTop <= distBottom;
+				}
+				else if (minDistV < edgeThreshold && minDistV < minDistH)
+				{
+					s_HoverEdgeV = true;
+					s_HoverEdgeH = false;
+					s_HoverEdgeLeft = distLeft <= distRight;
+				}
+				else
+				{
+					s_HoverEdgeH = false;
+					s_HoverEdgeV = false;
+				}
+
+				if (prevHoverH != s_HoverEdgeH || prevHoverV != s_HoverEdgeV)
 				{
 					if (SceneView.currentDrawingSceneView != null) SceneView.currentDrawingSceneView.Repaint();
 				}
 
-				if (e.type == EventType.Repaint)
+				// CRITICAL FIX FOR CANVAS RESIZE: Register 0f distance during Layout so Unity RectTool
+				// never intercepts edge clicks or resizes the Canvas RectTransform
+				if (e.type == EventType.Layout)
 				{
-					Color highlightColor = new Color(0.3f, 0.9f, 1f, 1f);
-					if (s_HoverAxisX)
+					if (s_HoverEdgeH || s_HoverEdgeV)
 					{
-						EditorGUIUtility.AddCursorRect(new Rect(0, 0, 10000, 10000), MouseCursor.ResizeVertical, controlID);
-						Handles.color = highlightColor;
-						DrawCrispLine(GridSettings.AxisThickness, center - right * halfWidth, center + right * halfWidth);
-					}
-					else if (s_HoverAxisY)
-					{
-						EditorGUIUtility.AddCursorRect(new Rect(0, 0, 10000, 10000), MouseCursor.ResizeHorizontal, controlID);
-						Handles.color = highlightColor;
-						DrawCrispLine(GridSettings.AxisThickness, center - up * halfHeight, center + up * halfHeight);
+						HandleUtility.AddControl(controlID, 0f);
 					}
 				}
 
-				if (e.type == EventType.MouseDown && e.button == 0 && (s_HoverAxisX || s_HoverAxisY))
+				if (e.type == EventType.Repaint)
+				{
+					DrawEdgePullTabs(BL, TL, TR, BR, localWidth, localHeight, right, up, controlID, mouseWorldPos);
+				}
+
+				if (e.type == EventType.MouseDown && e.button == 0 && (s_HoverEdgeH || s_HoverEdgeV))
 				{
 					s_IsAxisDragging = true;
-					s_AxisDragIsVertical = s_HoverAxisY; // Dragging from Y axis creates a vertical line
+					s_AxisDragIsVertical = s_HoverEdgeV; // Dragging Left/Right border creates vertical guide; Top/Bottom creates horizontal guide
 					GUIUtility.hotControl = controlID;
 					PrepareSnapLines(center, right, up);
 					e.Use();
@@ -1587,6 +1723,11 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 
 			if (s_IsAxisDragging)
 			{
+				if (e.type == EventType.Layout)
+				{
+					HandleUtility.AddDefaultControl(controlID);
+				}
+
 				if (e.type == EventType.KeyDown && e.keyCode == KeyCode.Escape)
 				{
 					s_IsAxisDragging = false;
@@ -1604,6 +1745,9 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 
 					EditorGUIUtility.AddCursorRect(new Rect(0, 0, 10000, 10000), s_AxisDragIsVertical ? MouseCursor.ResizeHorizontal : MouseCursor.ResizeVertical, controlID);
 					Handles.color = dragColor;
+
+					if (s_SnapWorldLinesX.Count == 0 && s_SnapWorldLinesY.Count == 0)
+						PrepareSnapLines(center, right, up);
 
 					if (s_AxisDragIsVertical)
 					{
@@ -1655,7 +1799,7 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 
 				if (e.type == EventType.MouseUp && e.button == 0)
 				{
-					Undo.RecordObject(GridSettingsAsset.instance, "Add Grid Line");
+					GridSettings.RecordUndo("Add Grid Line");
 
 					if (GridSettings.CurrentDynamicType == DynamicGridType.FixedPosition)
 					{
@@ -1834,38 +1978,54 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 						s_MirrorDragIndexX = -1;
 						s_MirrorDragIndexY = -1;
 
-						Undo.RecordObject(GridSettingsAsset.instance, "Move Grid Line");
+						GridSettings.RecordUndo("Move Grid Line");
 
 						if (GridSettings.IsMirrorModeActive)
 						{
 							if (s_DragIndexX != -1)
 							{
 								var list = GridSettings.CurrentDynamicType == DynamicGridType.FixedPosition ? GridSettings.DynamicFixedX : GridSettings.DynamicStretchX;
-								for (int i = 0; i < list.Count; i++) if (i != s_DragIndexX && IsMirroredValue(list[s_DragIndexX], list[i], GridSettings.CurrentDynamicType == DynamicGridType.FixedPosition)) { s_MirrorDragIndexX = i; break; }
-								
-								if (s_MirrorDragIndexX == -1)
+								if (s_DragIndexX >= 0 && s_DragIndexX < list.Count)
 								{
-									float val = list[s_DragIndexX];
-									float mirrorVal = GridSettings.CurrentDynamicType == DynamicGridType.FixedPosition ? -val : 1f - val;
-									list.Add(mirrorVal);
-									s_MirrorDragIndexX = list.Count - 1;
-									var aList = GridSettings.CurrentDynamicType == DynamicGridType.FixedPosition ? GridSettingsAsset.instance.DynamicFixedX : GridSettingsAsset.instance.DynamicStretchX;
-									aList.Add(mirrorVal);
+									for (int i = 0; i < list.Count; i++) if (i != s_DragIndexX && IsMirroredValue(list[s_DragIndexX], list[i], GridSettings.CurrentDynamicType == DynamicGridType.FixedPosition)) { s_MirrorDragIndexX = i; break; }
+									
+									if (s_MirrorDragIndexX == -1)
+									{
+										float val = list[s_DragIndexX];
+										float mirrorVal = GridSettings.CurrentDynamicType == DynamicGridType.FixedPosition ? -val : 1f - val;
+										list.Add(mirrorVal);
+										s_MirrorDragIndexX = list.Count - 1;
+										if (GridSettings.ActiveProfile != null)
+										{
+											var pList = GridSettings.CurrentDynamicType == DynamicGridType.FixedPosition ? GridSettings.ActiveProfile.DynamicFixedX : GridSettings.ActiveProfile.DynamicStretchX;
+											if (pList != null) pList.Add(mirrorVal);
+										}
+										var aList = GridSettings.CurrentDynamicType == DynamicGridType.FixedPosition ? GridSettingsAsset.instance?.DynamicFixedX : GridSettingsAsset.instance?.DynamicStretchX;
+										if (aList != null) aList.Add(mirrorVal);
+									}
 								}
 							}
 							if (s_DragIndexY != -1)
 							{
 								var list = GridSettings.CurrentDynamicType == DynamicGridType.FixedPosition ? GridSettings.DynamicFixedY : GridSettings.DynamicStretchY;
-								for (int i = 0; i < list.Count; i++) if (i != s_DragIndexY && IsMirroredValue(list[s_DragIndexY], list[i], GridSettings.CurrentDynamicType == DynamicGridType.FixedPosition)) { s_MirrorDragIndexY = i; break; }
-								
-								if (s_MirrorDragIndexY == -1)
+								if (s_DragIndexY >= 0 && s_DragIndexY < list.Count)
 								{
-									float val = list[s_DragIndexY];
-									float mirrorVal = GridSettings.CurrentDynamicType == DynamicGridType.FixedPosition ? -val : 1f - val;
-									list.Add(mirrorVal);
-									s_MirrorDragIndexY = list.Count - 1;
-									var aList = GridSettings.CurrentDynamicType == DynamicGridType.FixedPosition ? GridSettingsAsset.instance.DynamicFixedY : GridSettingsAsset.instance.DynamicStretchY;
-									aList.Add(mirrorVal);
+									for (int i = 0; i < list.Count; i++) if (i != s_DragIndexY && IsMirroredValue(list[s_DragIndexY], list[i], GridSettings.CurrentDynamicType == DynamicGridType.FixedPosition)) { s_MirrorDragIndexY = i; break; }
+									
+									if (s_MirrorDragIndexY == -1)
+									{
+										float val = list[s_DragIndexY];
+										float mirrorVal = GridSettings.CurrentDynamicType == DynamicGridType.FixedPosition ? -val : 1f - val;
+										list.Add(mirrorVal);
+										s_MirrorDragIndexY = list.Count - 1;
+										if (GridSettings.ActiveProfile != null)
+										{
+											var pList = GridSettings.CurrentDynamicType == DynamicGridType.FixedPosition ? GridSettings.ActiveProfile.DynamicFixedY : GridSettings.ActiveProfile.DynamicStretchY;
+											if (pList != null) pList.Add(mirrorVal);
+										}
+										var aList = GridSettings.CurrentDynamicType == DynamicGridType.FixedPosition ? GridSettingsAsset.instance?.DynamicFixedY : GridSettingsAsset.instance?.DynamicStretchY;
+										if (aList != null) aList.Add(mirrorVal);
+									}
 								}
 							}
 						}
@@ -1889,6 +2049,9 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 				Rect cursorRect = new Rect(0, 0, 10000, 10000); // Cover whole scene view
 				if (s_IsDragging)
 				{
+					if (s_SnapWorldLinesX.Count == 0 && s_SnapWorldLinesY.Count == 0)
+						PrepareSnapLines(center, right, up);
+
 					if (s_DragIndexX != -1) 
 					{
 						EditorGUIUtility.AddCursorRect(cursorRect, MouseCursor.ResizeHorizontal, controlID);
@@ -1915,64 +2078,96 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 			{
 				if (e.type == EventType.MouseDrag)
 				{
+					if (s_SnapWorldLinesX.Count == 0 && s_SnapWorldLinesY.Count == 0)
+						PrepareSnapLines(center, right, up);
 					if (GridSettings.CurrentDynamicType == DynamicGridType.FixedPosition)
 					{
-						if (s_DragIndexX != -1) 
+						if (s_DragIndexX >= 0 && s_DragIndexX < GridSettings.DynamicFixedX.Count) 
 						{
 							float val = ApplySnap(Vector3.Dot(mouseWorldPos - center, right), s_SnapWorldLinesX, s_SnapSourcesX) / scaleX;
 							GridSettings.DynamicFixedX[s_DragIndexX] = val;
-							if (s_MirrorDragIndexX != -1) GridSettings.DynamicFixedX[s_MirrorDragIndexX] = -val;
+							if (s_MirrorDragIndexX >= 0 && s_MirrorDragIndexX < GridSettings.DynamicFixedX.Count)
+								GridSettings.DynamicFixedX[s_MirrorDragIndexX] = -val;
 						}
-						if (s_DragIndexY != -1) 
+						if (s_DragIndexY >= 0 && s_DragIndexY < GridSettings.DynamicFixedY.Count) 
 						{
 							float val = ApplySnap(Vector3.Dot(mouseWorldPos - center, up), s_SnapWorldLinesY, s_SnapSourcesY) / scaleY;
 							GridSettings.DynamicFixedY[s_DragIndexY] = val;
-							if (s_MirrorDragIndexY != -1) GridSettings.DynamicFixedY[s_MirrorDragIndexY] = -val;
+							if (s_MirrorDragIndexY >= 0 && s_MirrorDragIndexY < GridSettings.DynamicFixedY.Count)
+								GridSettings.DynamicFixedY[s_MirrorDragIndexY] = -val;
 						}
 					}
 					else // Stretch Model
 					{
-						if (s_DragIndexX != -1) 
+						if (s_DragIndexX >= 0 && s_DragIndexX < GridSettings.DynamicStretchX.Count) 
 						{
 							float val = (ApplySnap(Vector3.Dot(mouseWorldPos - center, right), s_SnapWorldLinesX, s_SnapSourcesX) + halfWidth) / canvasWidth;
 							val = Mathf.Clamp01(val);
 							GridSettings.DynamicStretchX[s_DragIndexX] = val;
-							if (s_MirrorDragIndexX != -1) GridSettings.DynamicStretchX[s_MirrorDragIndexX] = Mathf.Clamp01(1f - val);
+							if (s_MirrorDragIndexX >= 0 && s_MirrorDragIndexX < GridSettings.DynamicStretchX.Count)
+								GridSettings.DynamicStretchX[s_MirrorDragIndexX] = Mathf.Clamp01(1f - val);
 						}
-						if (s_DragIndexY != -1) 
+						if (s_DragIndexY >= 0 && s_DragIndexY < GridSettings.DynamicStretchY.Count) 
 						{
 							float val = (ApplySnap(Vector3.Dot(mouseWorldPos - center, up), s_SnapWorldLinesY, s_SnapSourcesY) + halfHeight) / canvasHeight;
 							val = Mathf.Clamp01(val);
 							GridSettings.DynamicStretchY[s_DragIndexY] = val;
-							if (s_MirrorDragIndexY != -1) GridSettings.DynamicStretchY[s_MirrorDragIndexY] = Mathf.Clamp01(1f - val);
+							if (s_MirrorDragIndexY >= 0 && s_MirrorDragIndexY < GridSettings.DynamicStretchY.Count)
+								GridSettings.DynamicStretchY[s_MirrorDragIndexY] = Mathf.Clamp01(1f - val);
 						}
 					}
 
-					// Update the asset's RAM representation without touching disk or Undo so Editor GUI knows it's dirty
-					var a = GridSettingsAsset.instance;
+					// Safely update the active profile and global asset's RAM representation without touching disk or Undo
+					var activeProf = GridSettings.ActiveProfile;
+					var globalAsset = GridSettingsAsset.instance;
+
+					void SafeSet(List<float> targetList, int index, float val)
+					{
+						if (targetList != null && index >= 0 && index < targetList.Count)
+							targetList[index] = val;
+					}
+
 					if (GridSettings.CurrentDynamicType == DynamicGridType.FixedPosition)
 					{
-						if (s_DragIndexX != -1) a.DynamicFixedX[s_DragIndexX] = GridSettings.DynamicFixedX[s_DragIndexX];
-						if (s_MirrorDragIndexX != -1) a.DynamicFixedX[s_MirrorDragIndexX] = GridSettings.DynamicFixedX[s_MirrorDragIndexX];
-						if (s_DragIndexY != -1) a.DynamicFixedY[s_DragIndexY] = GridSettings.DynamicFixedY[s_DragIndexY];
-						if (s_MirrorDragIndexY != -1) a.DynamicFixedY[s_MirrorDragIndexY] = GridSettings.DynamicFixedY[s_MirrorDragIndexY];
+						if (activeProf != null)
+						{
+							if (s_DragIndexX >= 0 && s_DragIndexX < GridSettings.DynamicFixedX.Count) SafeSet(activeProf.DynamicFixedX, s_DragIndexX, GridSettings.DynamicFixedX[s_DragIndexX]);
+							if (s_MirrorDragIndexX >= 0 && s_MirrorDragIndexX < GridSettings.DynamicFixedX.Count) SafeSet(activeProf.DynamicFixedX, s_MirrorDragIndexX, GridSettings.DynamicFixedX[s_MirrorDragIndexX]);
+							if (s_DragIndexY >= 0 && s_DragIndexY < GridSettings.DynamicFixedY.Count) SafeSet(activeProf.DynamicFixedY, s_DragIndexY, GridSettings.DynamicFixedY[s_DragIndexY]);
+							if (s_MirrorDragIndexY >= 0 && s_MirrorDragIndexY < GridSettings.DynamicFixedY.Count) SafeSet(activeProf.DynamicFixedY, s_MirrorDragIndexY, GridSettings.DynamicFixedY[s_MirrorDragIndexY]);
+						}
+						if (globalAsset != null)
+						{
+							if (s_DragIndexX >= 0 && s_DragIndexX < GridSettings.DynamicFixedX.Count) SafeSet(globalAsset.DynamicFixedX, s_DragIndexX, GridSettings.DynamicFixedX[s_DragIndexX]);
+							if (s_MirrorDragIndexX >= 0 && s_MirrorDragIndexX < GridSettings.DynamicFixedX.Count) SafeSet(globalAsset.DynamicFixedX, s_MirrorDragIndexX, GridSettings.DynamicFixedX[s_MirrorDragIndexX]);
+							if (s_DragIndexY >= 0 && s_DragIndexY < GridSettings.DynamicFixedY.Count) SafeSet(globalAsset.DynamicFixedY, s_DragIndexY, GridSettings.DynamicFixedY[s_DragIndexY]);
+							if (s_MirrorDragIndexY >= 0 && s_MirrorDragIndexY < GridSettings.DynamicFixedY.Count) SafeSet(globalAsset.DynamicFixedY, s_MirrorDragIndexY, GridSettings.DynamicFixedY[s_MirrorDragIndexY]);
+						}
 					}
 					else
 					{
-						if (s_DragIndexX != -1) a.DynamicStretchX[s_DragIndexX] = GridSettings.DynamicStretchX[s_DragIndexX];
-						if (s_MirrorDragIndexX != -1) a.DynamicStretchX[s_MirrorDragIndexX] = GridSettings.DynamicStretchX[s_MirrorDragIndexX];
-						if (s_DragIndexY != -1) a.DynamicStretchY[s_DragIndexY] = GridSettings.DynamicStretchY[s_DragIndexY];
-						if (s_MirrorDragIndexY != -1) a.DynamicStretchY[s_MirrorDragIndexY] = GridSettings.DynamicStretchY[s_MirrorDragIndexY];
+						if (activeProf != null)
+						{
+							if (s_DragIndexX >= 0 && s_DragIndexX < GridSettings.DynamicStretchX.Count) SafeSet(activeProf.DynamicStretchX, s_DragIndexX, GridSettings.DynamicStretchX[s_DragIndexX]);
+							if (s_MirrorDragIndexX >= 0 && s_MirrorDragIndexX < GridSettings.DynamicStretchX.Count) SafeSet(activeProf.DynamicStretchX, s_MirrorDragIndexX, GridSettings.DynamicStretchX[s_MirrorDragIndexX]);
+							if (s_DragIndexY >= 0 && s_DragIndexY < GridSettings.DynamicStretchY.Count) SafeSet(activeProf.DynamicStretchY, s_DragIndexY, GridSettings.DynamicStretchY[s_DragIndexY]);
+							if (s_MirrorDragIndexY >= 0 && s_MirrorDragIndexY < GridSettings.DynamicStretchY.Count) SafeSet(activeProf.DynamicStretchY, s_MirrorDragIndexY, GridSettings.DynamicStretchY[s_MirrorDragIndexY]);
+						}
+						if (globalAsset != null)
+						{
+							if (s_DragIndexX >= 0 && s_DragIndexX < GridSettings.DynamicStretchX.Count) SafeSet(globalAsset.DynamicStretchX, s_DragIndexX, GridSettings.DynamicStretchX[s_DragIndexX]);
+							if (s_MirrorDragIndexX >= 0 && s_MirrorDragIndexX < GridSettings.DynamicStretchX.Count) SafeSet(globalAsset.DynamicStretchX, s_MirrorDragIndexX, GridSettings.DynamicStretchX[s_MirrorDragIndexX]);
+							if (s_DragIndexY >= 0 && s_DragIndexY < GridSettings.DynamicStretchY.Count) SafeSet(globalAsset.DynamicStretchY, s_DragIndexY, GridSettings.DynamicStretchY[s_DragIndexY]);
+							if (s_MirrorDragIndexY >= 0 && s_MirrorDragIndexY < GridSettings.DynamicStretchY.Count) SafeSet(globalAsset.DynamicStretchY, s_MirrorDragIndexY, GridSettings.DynamicStretchY[s_MirrorDragIndexY]);
+						}
 					}
 
 					e.Use();
 				}
 				else if (e.type == EventType.MouseUp && e.button == 0)
 				{
-					if (s_MirrorDragIndexX != -1 || s_MirrorDragIndexY != -1)
-					{
-						GridSettings.SaveDynamicLists();
-					}
+					GridSettings.SaveDynamicLists();
+
 					// Clear the arrays cleanly on deselect
 					s_IsDragging = false;
 					s_MirrorDragIndexX = -1;
@@ -1985,7 +2180,6 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 					s_SnapHierarchyIsDirty = true; 
 					
 					GUIUtility.hotControl = 0;
-					GridSettingsAsset.instance.SaveToDisk();
 					if (SceneView.currentDrawingSceneView != null) SceneView.currentDrawingSceneView.Repaint();
 					e.Use();
 				}
@@ -2101,6 +2295,102 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 			string sign = px >= 0 ? "+" : "";
 
 			DrawPositionBadge(mouseWorldPos, $"{axis}: {sign}{px:F0} px");
+		}
+
+		private static void DrawEdgePullTabs(Vector3 BL, Vector3 TL, Vector3 TR, Vector3 BR,
+			float localWidth, float localHeight, Vector3 right, Vector3 up, int controlID, Vector3 mouseWorldPos)
+		{
+			// Subtle base color vs active hover color
+			Color idleRailColor   = new Color(0.2f, 0.75f, 1f, 0.35f);
+			Color hoverRailColor  = new Color(0.35f, 0.95f, 1f, 1f);
+			Color draggingColor   = new Color(1f, 0.85f, 0.2f, 1f);
+
+			bool isHoverTop    = s_HoverEdgeH && s_HoverEdgeTop;
+			bool isHoverBottom = s_HoverEdgeH && !s_HoverEdgeTop;
+			bool isHoverLeft   = s_HoverEdgeV && s_HoverEdgeLeft;
+			bool isHoverRight  = s_HoverEdgeV && !s_HoverEdgeLeft;
+
+			Color topColor    = (s_IsAxisDragging && !s_AxisDragIsVertical) ? draggingColor : (isHoverTop ? hoverRailColor : idleRailColor);
+			Color bottomColor = (s_IsAxisDragging && !s_AxisDragIsVertical) ? draggingColor : (isHoverBottom ? hoverRailColor : idleRailColor);
+			Color leftColor   = (s_IsAxisDragging && s_AxisDragIsVertical) ? draggingColor : (isHoverLeft ? hoverRailColor : idleRailColor);
+			Color rightColor  = (s_IsAxisDragging && s_AxisDragIsVertical) ? draggingColor : (isHoverRight ? hoverRailColor : idleRailColor);
+
+			float topThick    = (isHoverTop || (s_IsAxisDragging && !s_AxisDragIsVertical)) ? 2.5f : 1.2f;
+			float bottomThick = (isHoverBottom || (s_IsAxisDragging && !s_AxisDragIsVertical)) ? 2.5f : 1.2f;
+			float leftThick   = (isHoverLeft || (s_IsAxisDragging && s_AxisDragIsVertical)) ? 2.5f : 1.2f;
+			float rightThick  = (isHoverRight || (s_IsAxisDragging && s_AxisDragIsVertical)) ? 2.5f : 1.2f;
+
+			// Draw crisp highlighted edge rails along canvas boundary
+			Handles.color = topColor;
+			DrawCrispLine(topThick, TL, TR);
+
+			Handles.color = bottomColor;
+			DrawCrispLine(bottomThick, BL, BR);
+
+			Handles.color = leftColor;
+			DrawCrispLine(leftThick, BL, TL);
+
+			Handles.color = rightColor;
+			DrawCrispLine(rightThick, BR, TR);
+
+			// Native Unity-style cursor feedback
+			if (isHoverTop || isHoverBottom)
+			{
+				EditorGUIUtility.AddCursorRect(new Rect(0, 0, 10000, 10000), MouseCursor.ResizeVertical, controlID);
+			}
+			else if (isHoverLeft || isHoverRight)
+			{
+				EditorGUIUtility.AddCursorRect(new Rect(0, 0, 10000, 10000), MouseCursor.ResizeHorizontal, controlID);
+			}
+
+			// Subtle native handle notch at mouse projection along hovered edge
+			if (isHoverTop || isHoverBottom || isHoverLeft || isHoverRight)
+			{
+				Vector3 edgePoint;
+				if (isHoverTop) edgePoint = HandleUtility.ProjectPointLine(mouseWorldPos, TL, TR);
+				else if (isHoverBottom) edgePoint = HandleUtility.ProjectPointLine(mouseWorldPos, BL, BR);
+				else if (isHoverLeft) edgePoint = HandleUtility.ProjectPointLine(mouseWorldPos, BL, TL);
+				else edgePoint = HandleUtility.ProjectPointLine(mouseWorldPos, BR, TR);
+
+				DrawEdgeHandleNotch(edgePoint, right, up, isHoverTop || isHoverBottom);
+
+				// Sleek native position badge near cursor showing clear action intent
+				DrawPositionBadge(mouseWorldPos, (isHoverTop || isHoverBottom) ? "Pull Horizontal Guide" : "Pull Vertical Guide");
+			}
+		}
+
+		private static void DrawEdgeHandleNotch(Vector3 center, Vector3 right, Vector3 up, bool isHorizontal)
+		{
+			float handleSize = HandleUtility.GetHandleSize(center);
+			float halfAlong = handleSize * 0.08f;
+			float halfAcross = handleSize * 0.04f;
+
+			Color notchColor = new Color(0.35f, 0.95f, 1f, 1f);
+			Color notchShadow = new Color(0f, 0f, 0f, 0.7f);
+
+			Vector3 p1, p2, p3, p4;
+			if (isHorizontal)
+			{
+				p1 = center - right * halfAlong;
+				p2 = center + up * halfAcross;
+				p3 = center + right * halfAlong;
+				p4 = center - up * halfAcross;
+			}
+			else
+			{
+				p1 = center - up * halfAlong;
+				p2 = center + right * halfAcross;
+				p3 = center + up * halfAlong;
+				p4 = center - right * halfAcross;
+			}
+
+			// Shadow pass
+			Handles.color = notchShadow;
+			Handles.DrawAAConvexPolygon(p1, p2, p3, p4);
+
+			// Crisp border
+			Handles.color = notchColor;
+			Handles.DrawAAPolyLine(2f, p1, p2, p3, p4, p1);
 		}
 
 		/// <summary>Draw dynamically placed editable lines.</summary>
@@ -2285,16 +2575,6 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 			float finalXAxisThickness = axisThickness;
 			float finalYAxisThickness = axisThickness;
 
-			if (isEditing && IsAddLinesMode)
-			{
-				Color addLinesHighlight = new Color(0.3f, 0.9f, 1f, 1f); // Bright cyan
-				finalXAxisColor = s_HoverAxisX ? addLinesHighlight : Color.Lerp(xAxisColor, addLinesHighlight, 0.5f);
-				finalYAxisColor = s_HoverAxisY ? addLinesHighlight : Color.Lerp(yAxisColor, addLinesHighlight, 0.5f);
-				
-				if (s_HoverAxisX) finalXAxisThickness += 1f;
-				if (s_HoverAxisY) finalYAxisThickness += 1f;
-			}
-
 			Handles.color = finalXAxisColor;
 			DrawCrispLine(finalXAxisThickness, Vector3.Lerp(BL, TL, 0.5f), Vector3.Lerp(BR, TR, 0.5f));
 
@@ -2456,7 +2736,12 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 			RefreshOpenWindows();
 		}
 
-		[MenuItem("Tools/UI Furnace/[Grid] Toggle Edit Mode &e", false, 10)]
+		[MenuItem("Tools/UI Furnace/Configure Shortcuts...", false, 20)]
+		public static void OpenShortcutManager()
+		{
+			EditorApplication.ExecuteMenuItem("Edit/Shortcuts...");
+		}
+
 		public static void ToggleEditMode()
 		{
 			if (GridSettings.CurrentMode != GridMode.CustomLines) return;
@@ -2472,10 +2757,6 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 			}
 		}
 
-		[MenuItem("Tools/UI Furnace/[Grid] Toggle Edit Mode &e", true, 10)]
-		private static bool ValidateToggleEditMode() => GridSettings.CurrentMode == GridMode.CustomLines;
-
-		[MenuItem("Tools/UI Furnace/[Grid] Add Horizontal Line &h", false, 11)]
 		public static void StartAddingHorizontalLine()
 		{
 			if (GridSettings.CurrentMode != GridMode.CustomLines || !GridSettings.IsEditModeActive) return;
@@ -2495,10 +2776,6 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 			if (SceneView.lastActiveSceneView != null) SceneView.lastActiveSceneView.Repaint();
 		}
 
-		[MenuItem("Tools/UI Furnace/[Grid] Add Horizontal Line &h", true, 11)]
-		private static bool ValidateAddHorizontalLine() => GridSettings.CurrentMode == GridMode.CustomLines && GridSettings.IsEditModeActive;
-
-		[MenuItem("Tools/UI Furnace/[Grid] Add Vertical Line &v", false, 12)]
 		public static void StartAddingVerticalLine()
 		{
 			if (GridSettings.CurrentMode != GridMode.CustomLines || !GridSettings.IsEditModeActive) return;
@@ -2518,17 +2795,13 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 			if (SceneView.lastActiveSceneView != null) SceneView.lastActiveSceneView.Repaint();
 		}
 
-		[MenuItem("Tools/UI Furnace/[Grid] Add Vertical Line &v", true, 12)]
-		private static bool ValidateAddVerticalLine() => GridSettings.CurrentMode == GridMode.CustomLines && GridSettings.IsEditModeActive;
-
-		[MenuItem("Tools/UI Furnace/[Grid] Delete Selected Lines &BACKSPACE", false, 13)]
 		public static void DeleteSelectedLines()
 		{
 			if (GridSettings.CurrentMode != GridMode.CustomLines || !GridSettings.IsEditModeActive || s_IsAddingLine) return;
 			
 			if (SelectedIndicesX.Count > 0 || SelectedIndicesY.Count > 0)
 			{
-				Undo.RecordObject(GridSettingsAsset.instance, "Delete Grid Lines");
+				GridSettings.RecordUndo("Delete Grid Lines");
 
 				// Cancel active drag to prevent out of bounds exceptions
 				s_IsDragging = false;
@@ -2542,8 +2815,11 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 					foreach (int idx in SelectedIndicesX)
 					{
 						var list = GridSettings.CurrentDynamicType == DynamicGridType.FixedPosition ? GridSettings.DynamicFixedX : GridSettings.DynamicStretchX;
-						float val = list[idx];
-						for (int i = 0; i < list.Count; i++) if (i != idx && IsMirroredValue(val, list[i], GridSettings.CurrentDynamicType == DynamicGridType.FixedPosition)) { if (!SelectedIndicesX.Contains(i) && !mx.Contains(i)) mx.Add(i); }
+						if (idx >= 0 && idx < list.Count)
+						{
+							float val = list[idx];
+							for (int i = 0; i < list.Count; i++) if (i != idx && IsMirroredValue(val, list[i], GridSettings.CurrentDynamicType == DynamicGridType.FixedPosition)) { if (!SelectedIndicesX.Contains(i) && !mx.Contains(i)) mx.Add(i); }
+						}
 					}
 					SelectedIndicesX.AddRange(mx);
 					
@@ -2551,8 +2827,11 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 					foreach (int idx in SelectedIndicesY)
 					{
 						var list = GridSettings.CurrentDynamicType == DynamicGridType.FixedPosition ? GridSettings.DynamicFixedY : GridSettings.DynamicStretchY;
-						float val = list[idx];
-						for (int i = 0; i < list.Count; i++) if (i != idx && IsMirroredValue(val, list[i], GridSettings.CurrentDynamicType == DynamicGridType.FixedPosition)) { if (!SelectedIndicesY.Contains(i) && !my.Contains(i)) my.Add(i); }
+						if (idx >= 0 && idx < list.Count)
+						{
+							float val = list[idx];
+							for (int i = 0; i < list.Count; i++) if (i != idx && IsMirroredValue(val, list[i], GridSettings.CurrentDynamicType == DynamicGridType.FixedPosition)) { if (!SelectedIndicesY.Contains(i) && !my.Contains(i)) my.Add(i); }
+						}
 					}
 					SelectedIndicesY.AddRange(my);
 				}
@@ -2563,14 +2842,26 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 
 				foreach (int index in SelectedIndicesX)
 				{
-					if (GridSettings.CurrentDynamicType == DynamicGridType.FixedPosition) GridSettings.DynamicFixedX.RemoveAt(index);
-					else GridSettings.DynamicStretchX.RemoveAt(index);
+					if (GridSettings.CurrentDynamicType == DynamicGridType.FixedPosition)
+					{
+						if (index >= 0 && index < GridSettings.DynamicFixedX.Count) GridSettings.DynamicFixedX.RemoveAt(index);
+					}
+					else
+					{
+						if (index >= 0 && index < GridSettings.DynamicStretchX.Count) GridSettings.DynamicStretchX.RemoveAt(index);
+					}
 				}
 
 				foreach (int index in SelectedIndicesY)
 				{
-					if (GridSettings.CurrentDynamicType == DynamicGridType.FixedPosition) GridSettings.DynamicFixedY.RemoveAt(index);
-					else GridSettings.DynamicStretchY.RemoveAt(index);
+					if (GridSettings.CurrentDynamicType == DynamicGridType.FixedPosition)
+					{
+						if (index >= 0 && index < GridSettings.DynamicFixedY.Count) GridSettings.DynamicFixedY.RemoveAt(index);
+					}
+					else
+					{
+						if (index >= 0 && index < GridSettings.DynamicStretchY.Count) GridSettings.DynamicStretchY.RemoveAt(index);
+					}
 				}
 				
 				GridSettings.SaveDynamicLists();
@@ -2583,11 +2874,6 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 			}
 		}
 
-		[MenuItem("Tools/UI Furnace/[Grid] Delete Selected Lines &BACKSPACE", true, 13)]
-		private static bool ValidateDeleteSelectedLines() => GridSettings.CurrentMode == GridMode.CustomLines && GridSettings.IsEditModeActive && (SelectedIndicesX.Count > 0 || SelectedIndicesY.Count > 0);
-
-		// #8 — Mirror Mode menu item (so it also appears in Tools > UI Furnace)
-		[MenuItem("Tools/UI Furnace/[Grid] Toggle Mirror Mode &m", false, 14)]
 		public static void ToggleMirrorMode()
 		{
 			if (GridSettings.CurrentMode != GridMode.CustomLines || !GridSettings.IsEditModeActive) return;
@@ -2596,10 +2882,6 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 			RefreshOpenWindows();
 		}
 
-		[MenuItem("Tools/UI Furnace/[Grid] Toggle Mirror Mode &m", true, 14)]
-		private static bool ValidateToggleMirrorMode() => GridSettings.CurrentMode == GridMode.CustomLines && GridSettings.IsEditModeActive;
-
-		[MenuItem("Tools/UI Furnace/[Grid] Toggle Snap Lines to UI &s", false, 15)]
 		public static void ToggleSnapLinesToUI()
 		{
 			if (GridSettings.CurrentMode != GridMode.CustomLines || !GridSettings.IsEditModeActive) return;
@@ -2607,9 +2889,6 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 			SceneView.RepaintAll();
 			RefreshOpenWindows();
 		}
-
-		[MenuItem("Tools/UI Furnace/[Grid] Toggle Snap Lines to UI &s", true, 15)]
-		private static bool ValidateToggleSnapLinesToUI() => GridSettings.CurrentMode == GridMode.CustomLines && GridSettings.IsEditModeActive;
 
 		private static void RefreshOpenWindows()
 		{
@@ -2624,8 +2903,10 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 			s_IsAddingLine   = false;
 			IsAddLinesMode   = false;
 			s_IsAxisDragging = false;
-			s_HoverAxisX = false;
-			s_HoverAxisY = false;
+			s_HoverEdgeH = false;
+			s_HoverEdgeV = false;
+			s_HoverEdgeTop = false;
+			s_HoverEdgeLeft = false;
 			GUIUtility.hotControl = 0;
 			SelectedIndicesX.Clear();
 			SelectedIndicesY.Clear();

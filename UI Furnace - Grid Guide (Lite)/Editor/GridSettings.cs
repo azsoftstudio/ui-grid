@@ -82,11 +82,12 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 				win.CreateGUI();
 		}
 
-		private static void RecordUndo(string label)
+		public static void RecordUndo(string label)
 		{
 			if (ActiveProfile != null)
 				Undo.RecordObject(ActiveProfile, label);
-			Undo.RecordObject(GridSettingsAsset.instance, label);
+			if (GridSettingsAsset.instance != null)
+				Undo.RecordObject(GridSettingsAsset.instance, label);
 		}
 
 		// ─── Load ──────────────────────────────────────────────────────────────

@@ -25,22 +25,23 @@ MonoBehaviour:
   GridSpacingY: 50
   GridColumns: 6
   GridRows: 6
-  DynamicStretchX:
-  - 0.0778211
-  - 0.18498492
-  - 0.9296597
-  DynamicStretchY:
-  - 0.3973564
-  - 0.86582917
-  - 0.75
+  DynamicStretchX: []
+  DynamicStretchY: []
   DynamicFixedX:
-  - -434.4221
-  - -324.1505
-  - 442.11984
+  - -118.10358
+  - 284.5
+  - 468.5802
+  - -502.6856
+  - 502.6856
   DynamicFixedY:
-  - -58.096283
-  - 207.05931
-  - 141.5
+  - -76.94556
+  - 141.49991
+  - 245.43372
+  - -37.838844
+  - 54.25
+  - 27.125
+  - 0
+  - -182.79794
   SnapToElements: 1
   SnapElementsToGrid: 1
   SnapDistance: 28.82

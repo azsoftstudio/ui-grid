@@ -39,6 +39,92 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 			if (_window == this) _window = null;
 		}
 
+		private static Texture2D FindEditorIcon(params string[] names)
+		{
+			foreach (var name in names)
+			{
+				if (string.IsNullOrEmpty(name)) continue;
+				var tex = EditorGUIUtility.FindTexture(name);
+				if (tex != null) return tex;
+			}
+			return null;
+		}
+
+		private static Button CreateHeaderIconButton(Texture2D icon, string tooltip, System.Action onClick, string fallbackText = "?")
+		{
+			var btn = new Button(onClick)
+			{
+				tooltip = tooltip,
+				style =
+				{
+					width = 24, height = 24,
+					marginLeft = 4,
+					paddingLeft = 0, paddingRight = 0, paddingTop = 0, paddingBottom = 0,
+					backgroundColor = Color.clear,
+					borderLeftWidth = 0, borderRightWidth = 0, borderTopWidth = 0, borderBottomWidth = 0,
+					borderTopLeftRadius = 4, borderTopRightRadius = 4,
+					borderBottomLeftRadius = 4, borderBottomRightRadius = 4,
+					justifyContent = Justify.Center, alignItems = Align.Center,
+					flexShrink = 0
+				}
+			};
+
+			if (icon != null)
+			{
+				var img = new Image
+				{
+					image = icon,
+					scaleMode = ScaleMode.ScaleToFit,
+					pickingMode = PickingMode.Ignore,
+					style = { width = 16, height = 16, opacity = 0.85f }
+				};
+				btn.Add(img);
+				btn.RegisterCallback<MouseEnterEvent>(evt => {
+					btn.style.backgroundColor = new Color(1f, 1f, 1f, 0.08f);
+					img.style.opacity = 1f;
+				});
+				btn.RegisterCallback<MouseLeaveEvent>(evt => {
+					btn.style.backgroundColor = Color.clear;
+					img.style.opacity = 0.85f;
+				});
+			}
+			else
+			{
+				btn.text = fallbackText;
+				btn.style.fontSize = 11;
+				btn.style.unityFontStyleAndWeight = FontStyle.Bold;
+				btn.RegisterCallback<MouseEnterEvent>(evt => btn.style.backgroundColor = new Color(1f, 1f, 1f, 0.08f));
+				btn.RegisterCallback<MouseLeaveEvent>(evt => btn.style.backgroundColor = Color.clear);
+			}
+
+			return btn;
+		}
+
+		private static Label CreateKeycapBadge(string text, string tooltip = "Shortcut")
+		{
+			return new Label(text)
+			{
+				tooltip = tooltip,
+				style =
+				{
+					fontSize = 9,
+					unityFontStyleAndWeight = FontStyle.Bold,
+					backgroundColor = new Color(0f, 0f, 0f, 0.25f),
+					borderLeftWidth = 1, borderRightWidth = 1, borderTopWidth = 1, borderBottomWidth = 1,
+					borderLeftColor = new Color(0.5f, 0.5f, 0.5f, 0.22f),
+					borderRightColor = new Color(0.5f, 0.5f, 0.5f, 0.22f),
+					borderTopColor = new Color(0.5f, 0.5f, 0.5f, 0.22f),
+					borderBottomColor = new Color(0.5f, 0.5f, 0.5f, 0.22f),
+					borderTopLeftRadius = 3, borderTopRightRadius = 3,
+					borderBottomLeftRadius = 3, borderBottomRightRadius = 3,
+					paddingLeft = 5, paddingRight = 5,
+					paddingTop = 2, paddingBottom = 2,
+					opacity = 0.75f,
+					alignSelf = Align.Center
+				}
+			};
+		}
+
 		public void CreateGUI()
 		{
 			GridSettings.LoadCurrentSettings();
@@ -59,18 +145,111 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 			};
 			scroll.Add(root);
 
-			// Title row — label + ? help button
-			var titleRow = new VisualElement { style = { flexDirection = FlexDirection.Row, alignItems = Align.Center, justifyContent = Justify.Center, marginBottom = 8 } };
-			titleRow.Add(new Label("Grid Manager")
+			// =========================================================================
+			// HEADER BANNER (Branded & Native Unity Look)
+			// =========================================================================
+			var header = new VisualElement
 			{
 				style =
 				{
+					flexDirection = FlexDirection.Row,
+					alignItems = Align.Center,
+					justifyContent = Justify.SpaceBetween,
+					paddingLeft = 8, paddingRight = 8,
+					paddingTop = 7, paddingBottom = 7,
+					marginBottom = 8,
+					backgroundColor = new Color(0f, 0f, 0f, 0.16f),
+					borderBottomWidth = 1,
+					borderBottomColor = new Color(0f, 0f, 0f, 0.28f),
+					borderTopLeftRadius = 6, borderTopRightRadius = 6,
+					borderBottomLeftRadius = 6, borderBottomRightRadius = 6
+				}
+			};
+
+			var brandRow = new VisualElement { style = { flexDirection = FlexDirection.Row, alignItems = Align.Center } };
+
+			var gridIcon = EditorGUIUtility.IconContent("d_GridLayoutGroup Icon")?.image as Texture2D;
+			if (gridIcon != null)
+			{
+				var iconImg = new Image
+				{
+					image = gridIcon,
+					pickingMode = PickingMode.Ignore,
+					style = { width = 22, height = 22, marginRight = 8, opacity = 0.9f }
+				};
+				brandRow.Add(iconImg);
+			}
+
+			var titleCol = new VisualElement { style = { flexDirection = FlexDirection.Column, justifyContent = Justify.Center } };
+
+			var superTitle = new Label("UI FURNACE")
+			{
+				style =
+				{
+					fontSize = 8,
 					unityFontStyleAndWeight = FontStyle.Bold,
-					fontSize = 16,
-					unityTextAlign = TextAnchor.MiddleCenter,
+					opacity = 0.45f,
+					marginBottom = -2
+				}
+			};
+			titleCol.Add(superTitle);
+
+			var nameRow = new VisualElement { style = { flexDirection = FlexDirection.Row, alignItems = Align.Center } };
+			nameRow.Add(new Label("Grid Manager")
+			{
+				style =
+				{
+					fontSize = 14,
+					unityFontStyleAndWeight = FontStyle.Bold,
+					marginRight = 6
 				}
 			});
-			var helpBtn = new Button(() =>
+
+			var badge = new Label("LITE")
+			{
+				style =
+				{
+					fontSize = 8,
+					unityFontStyleAndWeight = FontStyle.Bold,
+					color = new Color(0.45f, 0.78f, 1f, 1f),
+					backgroundColor = new Color(0.12f, 0.42f, 0.85f, 0.25f),
+					borderLeftWidth = 1, borderRightWidth = 1, borderTopWidth = 1, borderBottomWidth = 1,
+					borderLeftColor = new Color(0.3f, 0.6f, 1f, 0.35f),
+					borderRightColor = new Color(0.3f, 0.6f, 1f, 0.35f),
+					borderTopColor = new Color(0.3f, 0.6f, 1f, 0.35f),
+					borderBottomColor = new Color(0.3f, 0.6f, 1f, 0.35f),
+					borderTopLeftRadius = 3, borderTopRightRadius = 3,
+					borderBottomLeftRadius = 3, borderBottomRightRadius = 3,
+					paddingLeft = 4, paddingRight = 4,
+					paddingTop = 1, paddingBottom = 1,
+					alignSelf = Align.Center
+				}
+			};
+			nameRow.Add(badge);
+			titleCol.Add(nameRow);
+			brandRow.Add(titleCol);
+			header.Add(brandRow);
+
+			// Right action buttons (Native Unity icons)
+			var actionsRow = new VisualElement
+			{
+				style =
+				{
+					flexDirection = FlexDirection.Row,
+					alignItems = Align.Center,
+					flexShrink = 0,
+					marginLeft = 6
+				}
+			};
+
+			var shortcutIcon = FindEditorIcon("SettingsIcon", "d_SettingsIcon", "_Popup", "CustomTool", "d_CustomTool");
+			actionsRow.Add(CreateHeaderIconButton(shortcutIcon, "Configure Shortcuts (Edit → Shortcuts)", () =>
+			{
+				EditorApplication.ExecuteMenuItem("Edit/Shortcuts...");
+			}, "⌨"));
+
+			var helpIcon = EditorGUIUtility.IconContent("_Help")?.image as Texture2D;
+			actionsRow.Add(CreateHeaderIconButton(helpIcon, "Open Documentation (PDF)", () =>
 			{
 				string pdfPath = System.IO.Path.Combine(
 					System.IO.Path.GetDirectoryName(UnityEditor.AssetDatabase.GetAssetPath(
@@ -81,14 +260,10 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 					UnityEditor.EditorUtility.OpenWithDefaultApp(pdfPath);
 				else
 					UnityEditor.EditorUtility.DisplayDialog("Documentation", "Could not locate Documentation.pdf. Please check the Documentation folder inside the asset.", "OK");
-			})
-			{
-				text = "?",
-				tooltip = "Open the full documentation PDF",
-				style = { width = 20, height = 20, marginLeft = 8, paddingLeft = 0, paddingRight = 0, paddingTop = 0, paddingBottom = 0 }
-			};
-			titleRow.Add(helpBtn);
-			root.Add(titleRow);
+			}, "?"));
+
+			header.Add(actionsRow);
+			root.Add(header);
 
 			// World Space warning if active
 			if (GridRenderer.IsWorldSpaceCanvas)
@@ -98,14 +273,66 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 			}
 
 			// =========================================================================
-			// 1. GLOBAL SETTINGS (Show Grid is editor-wide, outside profile)
+			// 1. MASTER "SHOW GRID" CARD
 			// =========================================================================
-			var visRow = new VisualElement { style = { flexDirection = FlexDirection.Row, alignItems = Align.Center, justifyContent = Justify.SpaceBetween, marginTop = 4, marginBottom = 8 } };
-			var showGridToggle = new Toggle("Show Grid") { value = GridSettings.ShowGrid, style = { unityFontStyleAndWeight = FontStyle.Bold } };
-			showGridToggle.RegisterValueChangedCallback(evt => { GridSettings.SaveVisibility(evt.newValue); SceneView.RepaintAll(); });
-			visRow.Add(showGridToggle);
-			visRow.Add(new Label("Alt+G") { style = { fontSize = 10, unityFontStyleAndWeight = FontStyle.Italic, opacity = 0.6f } });
-			root.Add(visRow);
+			var masterCard = new VisualElement
+			{
+				style =
+				{
+					flexDirection = FlexDirection.Row,
+					alignItems = Align.Center,
+					justifyContent = Justify.SpaceBetween,
+					backgroundColor = new Color(0f, 0f, 0f, 0.12f),
+					borderTopLeftRadius = 5, borderTopRightRadius = 5,
+					borderBottomLeftRadius = 5, borderBottomRightRadius = 5,
+					borderLeftWidth = 3,
+					borderLeftColor = GridSettings.ShowGrid ? new Color(0.2f, 0.78f, 0.38f, 1f) : new Color(0.5f, 0.5f, 0.5f, 0.3f),
+					borderRightWidth = 1, borderTopWidth = 1, borderBottomWidth = 1,
+					borderRightColor = new Color(0.5f, 0.5f, 0.5f, 0.15f),
+					borderTopColor = new Color(0.5f, 0.5f, 0.5f, 0.15f),
+					borderBottomColor = new Color(0.5f, 0.5f, 0.5f, 0.15f),
+					paddingLeft = 8, paddingRight = 8,
+					paddingTop = 6, paddingBottom = 6,
+					marginBottom = 8
+				}
+			};
+
+			var masterLeft = new VisualElement { style = { flexDirection = FlexDirection.Row, alignItems = Align.Center } };
+
+			var statusDot = new Label(GridSettings.ShowGrid ? "●" : "○")
+			{
+				style =
+				{
+					fontSize = 11,
+					color = GridSettings.ShowGrid ? new Color(0.2f, 0.85f, 0.4f, 1f) : new Color(0.5f, 0.5f, 0.5f, 0.5f),
+					marginRight = 6,
+					marginTop = -1
+				}
+			};
+			masterLeft.Add(statusDot);
+
+			var showGridToggle = new Toggle("Show Grid")
+			{
+				value = GridSettings.ShowGrid,
+				style =
+				{
+					unityFontStyleAndWeight = FontStyle.Bold,
+					fontSize = 12
+				}
+			};
+			showGridToggle.RegisterValueChangedCallback(evt =>
+			{
+				GridSettings.SaveVisibility(evt.newValue);
+				statusDot.text = evt.newValue ? "●" : "○";
+				statusDot.style.color = evt.newValue ? new Color(0.2f, 0.85f, 0.4f, 1f) : new Color(0.5f, 0.5f, 0.5f, 0.5f);
+				masterCard.style.borderLeftColor = evt.newValue ? new Color(0.2f, 0.78f, 0.38f, 1f) : new Color(0.5f, 0.5f, 0.5f, 0.3f);
+				SceneView.RepaintAll();
+			});
+			masterLeft.Add(showGridToggle);
+			masterCard.Add(masterLeft);
+
+			masterCard.Add(CreateKeycapBadge("Alt+G", "Toggle Grid Shortcut (Edit → Shortcuts)"));
+			root.Add(masterCard);
 
 			// =========================================================================
 			// 2. CANVAS & PROFILE MANAGEMENT
@@ -141,17 +368,17 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 			// =========================================================================
 			// 4. UI INTERACTION (Snapping UI Elements)
 			// =========================================================================
-			var interactionFoldout = new Foldout { text = "UI Interaction", value = !GridSettings.InteractionCollapsed, style = { marginTop = 8 } };
+			var interactionFoldout = new Foldout { text = "UI Interaction", value = !GridSettings.InteractionCollapsed, style = { marginTop = 8, unityFontStyleAndWeight = FontStyle.Bold } };
 			interactionFoldout.RegisterValueChangedCallback(evt => GridSettings.SaveCollapseState("Interaction", !evt.newValue));
 			settingsContainer.Add(interactionFoldout);
 
 			var interactionGroup = new VisualElement { style = { marginLeft = 15 } };
 			
-			var gridSnapToggleRow = new VisualElement { style = { flexDirection = FlexDirection.Row, justifyContent = Justify.SpaceBetween, marginBottom = 8 } };
+			var gridSnapToggleRow = new VisualElement { style = { flexDirection = FlexDirection.Row, alignItems = Align.Center, justifyContent = Justify.SpaceBetween, marginBottom = 8 } };
 			var gridSnapToggleObj = new Toggle("Snap UI Elements to Grid") { value = GridSettings.SnapElementsToGrid, tooltip = "When you drag your UI elements around, they will magnetically snap to your grid lines!" };
 			gridSnapToggleObj.RegisterValueChangedCallback(evt => GridSettings.SaveSnapSettings(GridSettings.SnapToElements, evt.newValue, GridSettings.SnapDistance, GridSettings.ElementSnapDistance));
 			gridSnapToggleRow.Add(gridSnapToggleObj);
-			gridSnapToggleRow.Add(new Label("Alt+Shift+S") { style = { fontSize = 10, unityFontStyleAndWeight = FontStyle.Italic, opacity = 0.6f } });
+			gridSnapToggleRow.Add(CreateKeycapBadge("Alt+Shift+S", "Toggle Snapping Shortcut (Edit → Shortcuts)"));
 			interactionGroup.Add(gridSnapToggleRow);
 
 			var elemSnapDistField = GridUIHelpers.AddFloatFieldWithRef(interactionGroup, "Element Snap Dist.", "", GridSettings.ElementSnapDistance, (val) => 
@@ -168,7 +395,7 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 			// =========================================================================
 			// 5. GRID EDITING (Mode-Specific Editing Tools)
 			// =========================================================================
-			var editingFoldout = new Foldout { text = "Grid Editing", value = !GridSettings.EditingCollapsed, style = { marginTop = 8 } };
+			var editingFoldout = new Foldout { text = "Grid Editing", value = !GridSettings.EditingCollapsed, style = { marginTop = 8, unityFontStyleAndWeight = FontStyle.Bold } };
 			editingFoldout.RegisterValueChangedCallback(evt => GridSettings.SaveCollapseState("Editing", !evt.newValue));
 			settingsContainer.Add(editingFoldout);
 
@@ -211,26 +438,24 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 					SceneView.RepaintAll(); 
 				});
 				editRow.Add(editToggle);
-				editRow.Add(new Label("Alt+E") { style = { fontSize = 10, unityFontStyleAndWeight = FontStyle.Italic, opacity = 0.6f } });
 				editingGroup.Add(editRow);
 
 				var addLinesRow = new VisualElement { style = { flexDirection = FlexDirection.Row, justifyContent = Justify.SpaceBetween, marginBottom = 4 } };
-				var addLinesToggle = new Toggle("[Grid] Add Lines") { value = GridRenderer.IsAddLinesMode, tooltip = "Turn this on to click and drag new lines straight out of the center crosshair in your Scene view!" };
+				var addLinesToggle = new Toggle("Pull Guides from Edges") { value = GridRenderer.IsAddLinesMode, tooltip = "Turn this on to click and drag new guides directly from the canvas borders into your layout in the Scene view (Photoshop / Illustrator style)!" };
 				addLinesToggle.RegisterValueChangedCallback(evt => { GridRenderer.IsAddLinesMode = evt.newValue; SceneView.RepaintAll(); });
 				addLinesRow.Add(addLinesToggle);
 				subToolsGroup.Add(addLinesRow);
 
 				var mirrorRow = new VisualElement { style = { flexDirection = FlexDirection.Row, justifyContent = Justify.SpaceBetween, marginBottom = 4 } };
-				var mirrorToggle = new Toggle("[Grid] Mirror Mode") { value = GridSettings.IsMirrorModeActive, tooltip = "Turn this on to work symmetrically. When you pull a line to the right, a matching line will automatically appear on the left!" };
+				var mirrorToggle = new Toggle("Mirror Mode") { value = GridSettings.IsMirrorModeActive, tooltip = "Turn this on to work symmetrically. When you pull a line to the right, a matching line will automatically appear on the left!" };
 				mirrorToggle.RegisterValueChangedCallback(evt => { GridSettings.IsMirrorModeActive = evt.newValue; SceneView.RepaintAll(); });
 				mirrorRow.Add(mirrorToggle);
-				mirrorRow.Add(new Label("Alt+M") { style = { fontSize = 10, unityFontStyleAndWeight = FontStyle.Italic, opacity = 0.6f } });
 				subToolsGroup.Add(mirrorRow);
 
 				var deleteRow = new VisualElement { style = { flexDirection = FlexDirection.Row, alignItems = Align.Center, justifyContent = Justify.SpaceBetween, marginBottom = 8 } };
 				var deleteBtn = new Button(GridRenderer.DeleteSelectedLines) { text = "Delete Selected", style = { height = 20, flexGrow = 1, marginRight = 8 } };
 				deleteRow.Add(deleteBtn);
-				deleteRow.Add(new Label("Alt+Bksp") { style = { fontSize = 10, unityFontStyleAndWeight = FontStyle.Italic, opacity = 0.6f } });
+				deleteRow.Add(CreateKeycapBadge("Del", "Delete selected grid lines in Scene View"));
 				subToolsGroup.Add(deleteRow);
 
 				subToolsGroup.Add(new VisualElement { style = { height = 1, backgroundColor = new Color(0.5f, 0.5f, 0.5f, 0.2f), marginBottom = 8 } });
@@ -239,7 +464,6 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 				var snapToggleObj = new Toggle("Snap Lines to UI") { value = GridSettings.SnapToElements, tooltip = "When you drag a grid line, it will magnetically snap to the edges of your UI elements, making it super easy to align things!" };
 				snapToggleObj.RegisterValueChangedCallback(evt => GridSettings.SaveSnapSettings(evt.newValue, GridSettings.SnapElementsToGrid, GridSettings.SnapDistance, GridSettings.ElementSnapDistance));
 				snapToggleRow.Add(snapToggleObj);
-				snapToggleRow.Add(new Label("Alt+S") { style = { fontSize = 10, unityFontStyleAndWeight = FontStyle.Italic, opacity = 0.6f } });
 				subToolsGroup.Add(snapToggleRow);
 
 				var snapDistField = GridUIHelpers.AddFloatFieldWithRef(subToolsGroup, "Line Snap Distance", "", GridSettings.SnapDistance, (val) => 
@@ -253,7 +477,7 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 			// =========================================================================
 			// 6. VISUALS & APPEARANCE (The Look)
 			// =========================================================================
-			var visualsFoldout = new Foldout { text = "Visuals & Appearance", value = !GridSettings.VisualsCollapsed, style = { marginTop = 8 } };
+			var visualsFoldout = new Foldout { text = "Visuals & Appearance", value = !GridSettings.VisualsCollapsed, style = { marginTop = 8, unityFontStyleAndWeight = FontStyle.Bold } };
 			visualsFoldout.RegisterValueChangedCallback(evt => GridSettings.SaveCollapseState("Visuals", !evt.newValue));
 			settingsContainer.Add(visualsFoldout);
 
@@ -287,12 +511,12 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 
 
 			// Footer & Reset
-			settingsContainer.Add(new Label($"UI Furnace - Grid Guide (Lite) v{GridSettings.Version}")
+			settingsContainer.Add(new Label($"UI Furnace • Grid Guide (Lite) v{GridSettings.Version}")
 			{
 				style =
 				{
-					fontSize = 10, unityTextAlign = TextAnchor.MiddleCenter,
-					alignSelf = Align.Center, opacity = 0.5f, marginTop = 20
+					fontSize = 9, unityTextAlign = TextAnchor.MiddleCenter,
+					alignSelf = Align.Center, opacity = 0.45f, marginTop = 18, marginBottom = 4
 				}
 			});
 
@@ -310,7 +534,7 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 			{
 				text = "Reset All Settings",
 				tooltip = "Click to put all settings back to default. Your custom lines are safe!",
-				style = { marginTop = 8, height = 22 }
+				style = { height = 22, opacity = 0.85f }
 			};
 			settingsContainer.Add(resetBtn);
 		}
@@ -520,7 +744,7 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 
 		private VisualElement CreateGridLayoutCard()
 		{
-			var layoutFoldout = new Foldout { text = "Main Settings", value = !GridSettings.MainSettingsCollapsed };
+			var layoutFoldout = new Foldout { text = "Main Settings", value = !GridSettings.MainSettingsCollapsed, style = { unityFontStyleAndWeight = FontStyle.Bold } };
 			layoutFoldout.RegisterValueChangedCallback(evt => GridSettings.SaveCollapseState("MainSettings", !evt.newValue));
 
 			var layoutContent = new VisualElement { style = { marginLeft = 15 } };
@@ -539,7 +763,8 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 			});
 			mainModeRow.Add(modeDropdown);
 			
-			var modeHelpBtn = new Button(() => 
+			var helpIcon = EditorGUIUtility.IconContent("_Help")?.image as Texture2D;
+			var modeHelpBtn = CreateHeaderIconButton(helpIcon, "What is the difference between Uniform Grid and Custom Lines?", () => 
 			{
 				EditorUtility.DisplayDialog(
 					"Grid Mode — What's the difference?",
@@ -553,11 +778,7 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 					" • Fixed Position: Lines stay exactly where you dropped them.\n" +
 					" • Stretch with Canvas: Lines stick to a percentage of the screen. If the screen grows, the lines slide to stay in the same relative spot.",
 					"Got it");
-			})
-			{
-				text = "?", tooltip = "What is the difference between Uniform Grid and Custom Lines?",
-				style = { width = 20, height = 20, marginLeft = 4, paddingLeft = 0, paddingRight = 0, paddingTop = 0, paddingBottom = 0 }
-			};
+			}, "?");
 			mainModeRow.Add(modeHelpBtn);
 			layoutContent.Add(mainModeRow);
 
