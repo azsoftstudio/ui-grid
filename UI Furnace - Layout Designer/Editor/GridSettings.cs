@@ -220,7 +220,7 @@ namespace AZSoftStudio.UIFurnace.LayoutDesigner
 		/// <summary>
 		/// Synchronizes the active Canvas selection from the Scene or Hierarchy.
 		/// Loads the linked profile if one exists, or clears ActiveProfile if not.
-		/// Refreshes open GridManagerWindow instances and repaints SceneView.
+		/// Refreshes open LayoutDesignerWindow instances and repaints SceneView.
 		/// </summary>
 		public static void SyncCanvasSelection(Canvas canvas)
 		{

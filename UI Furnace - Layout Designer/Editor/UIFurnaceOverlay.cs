@@ -7,12 +7,12 @@ using UnityEngine.UIElements;
 namespace AZSoftStudio.UIFurnace.LayoutDesigner
 {
 	/// <summary>
-	/// Native Unity Scene View Overlay for UI Furnace Layout Designer.
+	/// Native Unity Scene View Overlay for Layout Designer.
 	/// Appears directly in Unity's native Scene View Overlay menu (under Custom).
 	/// Can be docked anywhere in the Scene View or floated natively by Unity.
 	/// Grouped logically into Status, Assist Toggles, Guide Tools, Danger Zone, and Finish actions.
 	/// </summary>
-	[Overlay(typeof(SceneView), "ui-furnace-layout-designer", "UI Furnace Layout Designer", defaultDisplay = true)]
+	[Overlay(typeof(SceneView), "ui-furnace-layout-designer", "Layout Designer", defaultDisplay = true)]
 	public class UIFurnaceOverlay : Overlay, ITransientOverlay
 	{
 		// Visible when grid display is enabled and either Edit Mode is active or a Canvas is selected
@@ -253,7 +253,7 @@ namespace AZSoftStudio.UIFurnace.LayoutDesigner
 					}
 					else
 					{
-						if (GUILayout.Button(new GUIContent("⚙ Settings", "Open and focus UI Furnace Layout Designer Window"), s_ButtonNormalStyle, GUILayout.Height(20)))
+						if (GUILayout.Button(new GUIContent("⚙ Settings", "Open and focus Layout Designer Window"), s_ButtonNormalStyle, GUILayout.Height(20)))
 						{
 							LayoutDesignerWindow.ShowWindowAndHighlight();
 						}

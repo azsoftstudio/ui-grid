@@ -1047,8 +1047,5 @@ namespace AZSoftStudio.UIFurnace.LayoutDesigner
 			parent.Add(advBtn);
 		}
 	}
-
-	// Backwards compatibility alias for existing saved Unity window layouts
-	public class GridManagerWindow : LayoutDesignerWindow { }
 }
 #endif
