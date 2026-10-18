@@ -72,7 +72,19 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 		private static double s_LastChangeTime        = 0.0;
 		private static bool   s_IsDelayedSaveScheduled = false;
 
-		// ─── Undo/Redo ─────────────────────────────────────────────────────────
+		// ─── Undo/Redo & Synchronization ──────────────────────────────────────
+		/// <summary>
+		/// Event raised whenever any grid setting, visibility, or mode is changed,
+		/// ensuring GridManagerWindow and Scene View Overlay stay in sync.
+		/// </summary>
+		public static event System.Action OnSettingsChanged;
+
+		public static void TriggerSettingsChanged()
+		{
+			OnSettingsChanged?.Invoke();
+			SceneView.RepaintAll();
+		}
+
 		static GridSettings()
 		{
 			Undo.undoRedoPerformed += OnUndoRedo;
@@ -348,6 +360,7 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 			Undo.RecordObject(GridSettingsAsset.instance, "Toggle Grid Visibility");
 			ShowGrid = show;
 			var a = GridSettingsAsset.instance; a.ShowGrid = show; a.SaveToDisk();
+			TriggerSettingsChanged();
 		}
 
 		public static void SaveMode(GridMode mode)
@@ -368,6 +381,7 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 			}
 
 			var a = GridSettingsAsset.instance; a.GridModeIndex = (int)mode; a.SaveToDisk();
+			TriggerSettingsChanged();
 		}
 
 		public static void SaveSnapSettings(bool snap, bool snapGrid, float distance, float elementDistance)
@@ -393,6 +407,7 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 			a.SnapDistance = distance;
 			a.ElementSnapDistance = elementDistance;
 			a.SaveToDisk();
+			TriggerSettingsChanged();
 		}
 
 		public static void SaveSymmetryMode(SymmetryMode mode)
@@ -407,6 +422,7 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 			}
 
 			var a = GridSettingsAsset.instance; a.SymmetryModeIndex = (int)mode; a.SaveToDisk();
+			TriggerSettingsChanged();
 		}
 
 		public static void SaveDynamicType(DynamicGridType type, float canvasWidth, float canvasHeight)
@@ -463,6 +479,7 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 			a.DynamicFixedX    = new List<float>(DynamicFixedX);
 			a.DynamicFixedY    = new List<float>(DynamicFixedY);
 			a.SaveToDisk();
+			TriggerSettingsChanged();
 		}
 
 		public static void SaveDynamicLists()
@@ -484,6 +501,7 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 			a.DynamicFixedX   = new List<float>(DynamicFixedX);
 			a.DynamicFixedY   = new List<float>(DynamicFixedY);
 			a.SaveToDisk();
+			TriggerSettingsChanged();
 		}
 
 		public static void SaveSpacing(float spacingX, float spacingY)
@@ -501,6 +519,7 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 
 			var a = GridSettingsAsset.instance;
 			a.GridSpacingX = GridSpacingX; a.GridSpacingY = GridSpacingY; a.SaveToDisk();
+			TriggerSettingsChanged();
 		}
 
 		public static void SaveDivisions(int columns, int rows)
@@ -518,6 +537,7 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 
 			var a = GridSettingsAsset.instance;
 			a.GridColumns = GridColumns; a.GridRows = GridRows; a.SaveToDisk();
+			TriggerSettingsChanged();
 		}
 
 		public static void SaveThickness(float axisThickness, float gridThickness)
@@ -693,20 +713,13 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 			}
 		}
 
-		public static void ResetAllToDefaults()
+		public static void ResetAllToDefaults(bool resetGridLayout = false)
 		{
-			RecordUndo("Reset All Grid Settings");
+			RecordUndo("Reset Grid Settings");
 
 			GridColor     = new Color(0.3f, 0.7f, 1f, 0.25f);
 			XAxisColor    = new Color(1f,   0.3f, 0.3f, 0.8f);
 			YAxisColor    = new Color(0.3f, 1f,   0.3f, 0.8f);
-			GridSpacingX  = 50f;
-			GridSpacingY  = 50f;
-			GridColumns   = 10;
-			GridRows      = 10;
-			CurrentMode         = GridMode.UniformGrid;
-			CurrentSymmetryMode = SymmetryMode.StretchWithCanvas;
-			CurrentDynamicType  = DynamicGridType.StretchWithCanvas;
 			AxisThickness = 3f;
 			GridThickness = 1f;
 			GridOpacity   = 1f;
@@ -715,18 +728,22 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 			SnapDistance  = 3f;
 			ElementSnapDistance = 1f;
 
+			if (resetGridLayout)
+			{
+				GridSpacingX  = 50f;
+				GridSpacingY  = 50f;
+				GridColumns   = 10;
+				GridRows      = 10;
+				CurrentMode         = GridMode.UniformGrid;
+				CurrentSymmetryMode = SymmetryMode.StretchWithCanvas;
+				CurrentDynamicType  = DynamicGridType.StretchWithCanvas;
+			}
+
 			if (ActiveProfile != null)
 			{
 				ActiveProfile.GridColor = GridColor;
 				ActiveProfile.XAxisColor = XAxisColor;
 				ActiveProfile.YAxisColor = YAxisColor;
-				ActiveProfile.GridSpacingX = GridSpacingX;
-				ActiveProfile.GridSpacingY = GridSpacingY;
-				ActiveProfile.GridColumns = GridColumns;
-				ActiveProfile.GridRows = GridRows;
-				ActiveProfile.CurrentMode = CurrentMode;
-				ActiveProfile.CurrentSymmetryMode = CurrentSymmetryMode;
-				ActiveProfile.CurrentDynamicType = CurrentDynamicType;
 				ActiveProfile.AxisThickness = AxisThickness;
 				ActiveProfile.GridThickness = GridThickness;
 				ActiveProfile.GridOpacity = GridOpacity;
@@ -734,6 +751,16 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 				ActiveProfile.SnapElementsToGrid = SnapElementsToGrid;
 				ActiveProfile.SnapDistance = SnapDistance;
 				ActiveProfile.ElementSnapDistance = ElementSnapDistance;
+				if (resetGridLayout)
+				{
+					ActiveProfile.GridSpacingX = GridSpacingX;
+					ActiveProfile.GridSpacingY = GridSpacingY;
+					ActiveProfile.GridColumns = GridColumns;
+					ActiveProfile.GridRows = GridRows;
+					ActiveProfile.CurrentMode = CurrentMode;
+					ActiveProfile.CurrentSymmetryMode = CurrentSymmetryMode;
+					ActiveProfile.CurrentDynamicType = CurrentDynamicType;
+				}
 				MarkProfileDirty();
 			}
 
@@ -741,13 +768,6 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 			a.GridColor     = GridColor;
 			a.XAxisColor    = XAxisColor;
 			a.YAxisColor    = YAxisColor;
-			a.GridSpacingX  = GridSpacingX;
-			a.GridSpacingY  = GridSpacingY;
-			a.GridColumns   = GridColumns;
-			a.GridRows      = GridRows;
-			a.GridModeIndex = 0;
-			a.SymmetryModeIndex = 1;
-			a.DynamicTypeIndex  = 1;
 			a.AxisThickness = AxisThickness;
 			a.GridThickness = GridThickness;
 			a.GridOpacity   = GridOpacity;
@@ -755,7 +775,18 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 			a.SnapElementsToGrid = SnapElementsToGrid;
 			a.SnapDistance  = SnapDistance;
 			a.ElementSnapDistance = ElementSnapDistance;
+			if (resetGridLayout)
+			{
+				a.GridSpacingX  = GridSpacingX;
+				a.GridSpacingY  = GridSpacingY;
+				a.GridColumns   = GridColumns;
+				a.GridRows      = GridRows;
+				a.GridModeIndex = (int)CurrentMode;
+				a.SymmetryModeIndex = (int)CurrentSymmetryMode;
+				a.DynamicTypeIndex  = (int)CurrentDynamicType;
+			}
 			a.SaveToDisk();
+			TriggerSettingsChanged();
 		}
 
 		// ─── Private helpers ───────────────────────────────────────────────────

@@ -51,6 +51,18 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 		private static bool s_IsAddingLine = false;
 		private static bool s_AddingLineIsVertical = false;
 
+		/// <summary>True when currently in interactive guide placement mode.</summary>
+		public static bool IsAddingLine => s_IsAddingLine;
+		/// <summary>True if currently placing a vertical guide, false if horizontal.</summary>
+		public static bool AddingLineIsVertical => s_AddingLineIsVertical;
+
+		/// <summary>Cancels interactive guide placement mode safely.</summary>
+		public static void CancelAddingLine()
+		{
+			s_IsAddingLine = false;
+			if (SceneView.lastActiveSceneView != null) SceneView.lastActiveSceneView.Repaint();
+		}
+
 		// â”€â”€â”€ Add Lines Mode (Drag from Axis) State â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 		/// <summary>When true, users can drag from the canvas edges to pull out a new horizontal/vertical guide.</summary>
 		public static bool IsAddLinesMode { get; set; } = false;
@@ -100,7 +112,46 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 			Selection.selectionChanged -= OnSelectionChanged;
 			Selection.selectionChanged += OnSelectionChanged;
 			EditorApplication.hierarchyChanged += () => s_SnapHierarchyIsDirty = true;
+
+			// P0 Safety: Reset all interaction state when entering/exiting play mode
+			// or after a domain reload to prevent phantom stuck states.
+			EditorApplication.playModeStateChanged += _ => ResetInteractionState();
+			AssemblyReloadEvents.afterAssemblyReload += ResetInteractionState;
+
 			GridSettings.LoadCurrentSettings();
+		}
+
+		/// <summary>
+		/// Resets all transient interaction state (drag, hover, add-line, axis-drag).
+		/// Called on play mode transitions, assembly reloads, and scene changes
+		/// to prevent the tool from getting stuck in a phantom mode.
+		/// </summary>
+		private static void ResetInteractionState()
+		{
+			s_IsAddingLine = false;
+			s_IsAxisDragging = false;
+			s_IsDragging = false;
+			s_DragIndexX = -1;
+			s_DragIndexY = -1;
+			s_MirrorDragIndexX = -1;
+			s_MirrorDragIndexY = -1;
+			s_HoverIndexX = -1;
+			s_HoverIndexY = -1;
+			s_HoverEdgeH = false;
+			s_HoverEdgeV = false;
+			s_HoverEdgeTop = false;
+			s_HoverEdgeLeft = false;
+			s_CurrentDragMode = DragMode.None;
+			s_HUDInitialized = false;
+			s_SpecHUDInitialized = false;
+			s_LastDraggedID = -1;
+			SelectedIndicesX.Clear();
+			SelectedIndicesY.Clear();
+			s_SnapHighlightedRects.Clear();
+			s_ElementSnapHighlightedRects.Clear();
+			s_HighlightOffsetsX.Clear();
+			s_HighlightOffsetsY.Clear();
+			InvalidateCache();
 		}
 
 		private static void OnSelectionChanged()
@@ -880,10 +931,10 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 				// Draw position badge on top of all grid lines, axes, and snap highlights
 				DrawPendingPositionBadge();
 
-				// Commercial-grade visual enhancement: Movable floating Canvas Spec HUD
+#if !UNITY_2021_2_OR_NEWER
+				// Fallback floating Canvas Spec HUD for Unity 2020 and earlier (Unity 2021.2+ uses native UIFurnaceOverlay)
 				DrawMovableSpecHUD(localWidth, localHeight);
 
-#if !UNITY_2021_2_OR_NEWER
 				// #7 — Scene View HUD: fallback for Unity 2020 and earlier (Unity 2021.2+ uses native UIFurnaceOverlay)
 				if (GridSettings.CurrentMode == GridMode.CustomLines && GridSettings.IsEditModeActive)
 					DrawEditModeHUD();
@@ -949,10 +1000,12 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 			s_HUDRect.x = Mathf.Clamp(s_HUDRect.x, 0, Mathf.Max(0, sv.position.width - s_HUDRect.width));
 			s_HUDRect.y = Mathf.Clamp(s_HUDRect.y, 0, Mathf.Max(0, sv.position.height - s_HUDRect.height));
 
+			float preHUDX = s_HUDRect.x;
+			float preHUDY = s_HUDRect.y;
 			int controlID = GUIUtility.GetControlID("UIFurnaceHUD".GetHashCode(), FocusType.Passive);
 			s_HUDRect = GUILayout.Window(controlID, s_HUDRect, HUDWindowContent, GUIContent.none, HUDWindowStyle);
 
-			if (Event.current.type == EventType.MouseUp)
+			if (Event.current.type == EventType.MouseUp && (Mathf.Abs(s_HUDRect.x - preHUDX) > 0.5f || Mathf.Abs(s_HUDRect.y - preHUDY) > 0.5f))
 			{
 				EditorPrefs.SetFloat("UIFurnace_HUD_X", s_HUDRect.x);
 				EditorPrefs.SetFloat("UIFurnace_HUD_Y", s_HUDRect.y);
@@ -1028,9 +1081,13 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 			// --- BAR 2: Toolbar Controls ---
 			GUILayout.BeginHorizontal();
 
+			Color defaultHUDControlBg = GUI.backgroundColor;
+
 			// 1. Snap Toggle
 			bool curSnap = GridSettings.SnapToElements;
-			bool newSnap = GUILayout.Toggle(curSnap, new GUIContent("Snap", "Toggle magnetic snapping to UI Elements"), EditorStyles.toolbarButton, GUILayout.Height(20));
+			if (curSnap) GUI.backgroundColor = new Color(0.22f, 0.58f, 0.94f, 1f);
+			bool newSnap = GUILayout.Toggle(curSnap, new GUIContent("Snap (Lines)", "Snap grid line to UI"), EditorStyles.toolbarButton, GUILayout.Height(20));
+			GUI.backgroundColor = defaultHUDControlBg;
 			if (newSnap != curSnap)
 			{
 				GridSettings.SaveSnapSettings(newSnap, GridSettings.SnapElementsToGrid, GridSettings.SnapDistance, GridSettings.ElementSnapDistance);
@@ -1039,34 +1096,48 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 
 			// 2. Mirror Toggle
 			bool curMirror = GridSettings.IsMirrorModeActive;
+			if (curMirror) GUI.backgroundColor = new Color(0.22f, 0.58f, 0.94f, 1f);
 			bool newMirror = GUILayout.Toggle(curMirror, new GUIContent("Mirror", "Toggle symmetric guide mirroring"), EditorStyles.toolbarButton, GUILayout.Height(20));
+			GUI.backgroundColor = defaultHUDControlBg;
 			if (newMirror != curMirror)
 			{
 				GridSettings.IsMirrorModeActive = newMirror;
 				SceneView.RepaintAll();
 			}
 
-			// 3. Add Horizontal Guide (Enters interactive guide placement mode)
-			if (GUILayout.Button(new GUIContent("+ H Line", "Enter interactive placement mode for a horizontal guide"), EditorStyles.toolbarButton, GUILayout.Height(20)))
+			// 3. Add Horizontal Guide
+			bool isAdding = s_IsAddingLine;
+			bool isAddingV = s_AddingLineIsVertical;
+			if (isAdding && !isAddingV) GUI.backgroundColor = new Color(0.98f, 0.65f, 0.15f, 1f);
+			string hLabel = (isAdding && !isAddingV) ? "Placing H..." : "+ H Line";
+			if (GUILayout.Button(new GUIContent(hLabel, "Place a horizontal guide (or click to cancel)"), EditorStyles.toolbarButton, GUILayout.Height(20)))
 			{
-				StartAddingHorizontalLine();
+				if (isAdding && !isAddingV) CancelAddingLine();
+				else StartAddingHorizontalLine();
 			}
+			GUI.backgroundColor = defaultHUDControlBg;
 
-			// 4. Add Vertical Guide (Enters interactive guide placement mode)
-			if (GUILayout.Button(new GUIContent("+ V Line", "Enter interactive placement mode for a vertical guide"), EditorStyles.toolbarButton, GUILayout.Height(20)))
+			// 4. Add Vertical Guide
+			if (isAdding && isAddingV) GUI.backgroundColor = new Color(0.98f, 0.65f, 0.15f, 1f);
+			string vLabel = (isAdding && isAddingV) ? "Placing V..." : "+ V Line";
+			if (GUILayout.Button(new GUIContent(vLabel, "Place a vertical guide (or click to cancel)"), EditorStyles.toolbarButton, GUILayout.Height(20)))
 			{
-				StartAddingVerticalLine();
+				if (isAdding && isAddingV) CancelAddingLine();
+				else StartAddingVerticalLine();
 			}
+			GUI.backgroundColor = defaultHUDControlBg;
 
 			// 5. Delete Selected Guides
 			int selCount = SelectedIndicesX.Count + SelectedIndicesY.Count;
 			bool hasSelection = selCount > 0;
 			GUI.enabled = hasSelection;
+			if (hasSelection) GUI.backgroundColor = new Color(0.92f, 0.28f, 0.28f, 1f);
 			string delLabel = hasSelection ? $"Delete ({selCount})" : "Delete";
 			if (GUILayout.Button(new GUIContent(delLabel, "Delete Selected Guides (Del)"), EditorStyles.toolbarButton, GUILayout.Height(20)))
 			{
 				DeleteSelectedLines();
 			}
+			GUI.backgroundColor = defaultHUDControlBg;
 			GUI.enabled = true;
 
 			GUILayout.EndHorizontal();
@@ -2374,10 +2445,12 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 			s_SpecHUDRect.x = Mathf.Clamp(s_SpecHUDRect.x, 0, Mathf.Max(0, sv.position.width - s_SpecHUDRect.width));
 			s_SpecHUDRect.y = Mathf.Clamp(s_SpecHUDRect.y, 0, Mathf.Max(0, sv.position.height - s_SpecHUDRect.height));
 
+			float preSpecX = s_SpecHUDRect.x;
+			float preSpecY = s_SpecHUDRect.y;
 			int controlID = GUIUtility.GetControlID("UIFurnaceSpecHUD".GetHashCode(), FocusType.Passive);
 			s_SpecHUDRect = GUILayout.Window(controlID, s_SpecHUDRect, id => SpecHUDWindowContent(id, textContent), GUIContent.none, SpecHUDWindowStyle);
 
-			if (Event.current.type == EventType.MouseUp)
+			if (Event.current.type == EventType.MouseUp && (Mathf.Abs(s_SpecHUDRect.x - preSpecX) > 0.5f || Mathf.Abs(s_SpecHUDRect.y - preSpecY) > 0.5f))
 			{
 				EditorPrefs.SetFloat("UIFurnace_SpecHUD_X", s_SpecHUDRect.x);
 				EditorPrefs.SetFloat("UIFurnace_SpecHUD_Y", s_SpecHUDRect.y);
@@ -2600,8 +2673,8 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 						bool isSelected = SelectedIndicesX.Contains(i);
 						bool isDraggedLine = s_IsDragging && s_DragIndexX == i;
 						bool isHoveredLine = !s_IsDragging && s_HoverIndexX == i;
-						bool isMirrorDragged = s_IsDragging && GridSettings.IsMirrorModeActive && s_DragIndexX != -1 && IsMirroredValue(GridSettings.DynamicFixedX[s_DragIndexX], GridSettings.DynamicFixedX[i], true);
-						bool isMirrorHovered = !s_IsDragging && GridSettings.IsMirrorModeActive && s_HoverIndexX != -1 && IsMirroredValue(GridSettings.DynamicFixedX[s_HoverIndexX], GridSettings.DynamicFixedX[i], true);
+						bool isMirrorDragged = s_IsDragging && GridSettings.IsMirrorModeActive && s_DragIndexX >= 0 && s_DragIndexX < GridSettings.DynamicFixedX.Count && IsMirroredValue(GridSettings.DynamicFixedX[s_DragIndexX], GridSettings.DynamicFixedX[i], true);
+						bool isMirrorHovered = !s_IsDragging && GridSettings.IsMirrorModeActive && s_HoverIndexX >= 0 && s_HoverIndexX < GridSettings.DynamicFixedX.Count && IsMirroredValue(GridSettings.DynamicFixedX[s_HoverIndexX], GridSettings.DynamicFixedX[i], true);
 
 						if (isDraggedLine || isMirrorDragged)
 						{
@@ -2631,8 +2704,8 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 						bool isSelected = SelectedIndicesY.Contains(i);
 						bool isDraggedLine = s_IsDragging && s_DragIndexY == i;
 						bool isHoveredLine = !s_IsDragging && s_HoverIndexY == i;
-						bool isMirrorDragged = s_IsDragging && GridSettings.IsMirrorModeActive && s_DragIndexY != -1 && IsMirroredValue(GridSettings.DynamicFixedY[s_DragIndexY], GridSettings.DynamicFixedY[i], true);
-						bool isMirrorHovered = !s_IsDragging && GridSettings.IsMirrorModeActive && s_HoverIndexY != -1 && IsMirroredValue(GridSettings.DynamicFixedY[s_HoverIndexY], GridSettings.DynamicFixedY[i], true);
+						bool isMirrorDragged = s_IsDragging && GridSettings.IsMirrorModeActive && s_DragIndexY >= 0 && s_DragIndexY < GridSettings.DynamicFixedY.Count && IsMirroredValue(GridSettings.DynamicFixedY[s_DragIndexY], GridSettings.DynamicFixedY[i], true);
+						bool isMirrorHovered = !s_IsDragging && GridSettings.IsMirrorModeActive && s_HoverIndexY >= 0 && s_HoverIndexY < GridSettings.DynamicFixedY.Count && IsMirroredValue(GridSettings.DynamicFixedY[s_HoverIndexY], GridSettings.DynamicFixedY[i], true);
 
 						if (isDraggedLine || isMirrorDragged)
 						{
@@ -2665,8 +2738,8 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 						bool isSelected = SelectedIndicesX.Contains(i);
 						bool isDraggedLine = s_IsDragging && s_DragIndexX == i;
 						bool isHoveredLine = !s_IsDragging && s_HoverIndexX == i;
-						bool isMirrorDragged = s_IsDragging && GridSettings.IsMirrorModeActive && s_DragIndexX != -1 && IsMirroredValue(GridSettings.DynamicStretchX[s_DragIndexX], t, false);
-						bool isMirrorHovered = !s_IsDragging && GridSettings.IsMirrorModeActive && s_HoverIndexX != -1 && IsMirroredValue(GridSettings.DynamicStretchX[s_HoverIndexX], t, false);
+						bool isMirrorDragged = s_IsDragging && GridSettings.IsMirrorModeActive && s_DragIndexX >= 0 && s_DragIndexX < GridSettings.DynamicStretchX.Count && IsMirroredValue(GridSettings.DynamicStretchX[s_DragIndexX], t, false);
+						bool isMirrorHovered = !s_IsDragging && GridSettings.IsMirrorModeActive && s_HoverIndexX >= 0 && s_HoverIndexX < GridSettings.DynamicStretchX.Count && IsMirroredValue(GridSettings.DynamicStretchX[s_HoverIndexX], t, false);
 
 						if (isDraggedLine || isMirrorDragged)
 						{
@@ -2697,8 +2770,8 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 						bool isSelected = SelectedIndicesY.Contains(i);
 						bool isDraggedLine = s_IsDragging && s_DragIndexY == i;
 						bool isHoveredLine = !s_IsDragging && s_HoverIndexY == i;
-						bool isMirrorDragged = s_IsDragging && GridSettings.IsMirrorModeActive && s_DragIndexY != -1 && IsMirroredValue(GridSettings.DynamicStretchY[s_DragIndexY], t, false);
-						bool isMirrorHovered = !s_IsDragging && GridSettings.IsMirrorModeActive && s_HoverIndexY != -1 && IsMirroredValue(GridSettings.DynamicStretchY[s_HoverIndexY], t, false);
+						bool isMirrorDragged = s_IsDragging && GridSettings.IsMirrorModeActive && s_DragIndexY >= 0 && s_DragIndexY < GridSettings.DynamicStretchY.Count && IsMirroredValue(GridSettings.DynamicStretchY[s_DragIndexY], t, false);
+						bool isMirrorHovered = !s_IsDragging && GridSettings.IsMirrorModeActive && s_HoverIndexY >= 0 && s_HoverIndexY < GridSettings.DynamicStretchY.Count && IsMirroredValue(GridSettings.DynamicStretchY[s_HoverIndexY], t, false);
 
 						if (isDraggedLine || isMirrorDragged)
 						{
@@ -2900,7 +2973,7 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 			else
 			{
 				GridSettings.IsEditModeActive = true;
-				SceneView.RepaintAll();
+				GridSettings.TriggerSettingsChanged();
 				RefreshOpenWindows();
 			}
 		}
@@ -3060,7 +3133,7 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 			SelectedIndicesY.Clear();
 			
 			// Force Repaint for all SceneViews and Manager Windows so the toggle switch visually turns off
-			SceneView.RepaintAll();
+			GridSettings.TriggerSettingsChanged();
 			RefreshOpenWindows();
 		}
 	}

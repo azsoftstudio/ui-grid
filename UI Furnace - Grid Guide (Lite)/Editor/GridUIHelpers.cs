@@ -50,11 +50,11 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 			return field;
 		}
 
-		public static void AddFloatField(VisualElement parent, string label, string key, float initialValue, System.Action<float> setter)
-			=> AddFloatFieldWithRef(parent, label, key, initialValue, setter);
+		public static void AddFloatField(VisualElement parent, string label, string key, float initialValue, System.Action<float> setter, float minVal = 0.1f)
+			=> AddFloatFieldWithRef(parent, label, key, initialValue, setter, minVal);
 
 		/// <summary>Same as AddFloatField but returns the FloatField so the caller can set .tooltip etc.</summary>
-		public static FloatField AddFloatFieldWithRef(VisualElement parent, string label, string key, float initialValue, System.Action<float> setter)
+		public static FloatField AddFloatFieldWithRef(VisualElement parent, string label, string key, float initialValue, System.Action<float> setter, float minVal = 0.1f)
 		{
 			var row = new VisualElement { style = { flexDirection = FlexDirection.Row, alignItems = Align.Center, marginBottom = 4 } };
 
@@ -63,17 +63,19 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 
 			field.RegisterValueChangedCallback(evt =>
 			{
-				float v = Mathf.Max(0.1f, evt.newValue);
+				float v = Mathf.Max(minVal, evt.newValue);
 				field.SetValueWithoutNotify(v);
 				setter(v);
-				GridSettings.ScheduleDelayedSave(key, () => { var a = GridSettingsAsset.instance; SetAssetFloat(a, key, v); });
+				if (!string.IsNullOrEmpty(key))
+					GridSettings.ScheduleDelayedSave(key, () => { var a = GridSettingsAsset.instance; SetAssetFloat(a, key, v); });
 				SceneView.RepaintAll();
 			});
 			field.RegisterCallback<BlurEvent>(evt =>
 			{
-				float v = Mathf.Max(0.1f, field.value);
+				float v = Mathf.Max(minVal, field.value);
 				field.SetValueWithoutNotify(v);
-				SetAssetFloat(GridSettingsAsset.instance, key, v);
+				if (!string.IsNullOrEmpty(key))
+					SetAssetFloat(GridSettingsAsset.instance, key, v);
 				GridSettings.FlushPendingSaves();
 			});
 			row.Add(field);
@@ -175,10 +177,12 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 		{
 			switch (key)
 			{
-				case "SpacingX":       a.GridSpacingX  = v; break;
-				case "SpacingY":       a.GridSpacingY  = v; break;
-				case "AxisThickness":  a.AxisThickness = v; break;
-				case "GridThickness":  a.GridThickness = v; break;
+				case "SpacingX":            a.GridSpacingX         = v; break;
+				case "SpacingY":            a.GridSpacingY         = v; break;
+				case "AxisThickness":       a.AxisThickness        = v; break;
+				case "GridThickness":       a.GridThickness        = v; break;
+				case "SnapDistance":        a.SnapDistance         = v; break;
+				case "ElementSnapDistance": a.ElementSnapDistance  = v; break;
 			}
 
 			if (GridSettings.ActiveProfile != null)
@@ -186,10 +190,12 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 				var p = GridSettings.ActiveProfile;
 				switch (key)
 				{
-					case "SpacingX":       p.GridSpacingX  = v; break;
-					case "SpacingY":       p.GridSpacingY  = v; break;
-					case "AxisThickness":  p.AxisThickness = v; break;
-					case "GridThickness":  p.GridThickness = v; break;
+					case "SpacingX":            p.GridSpacingX         = v; break;
+					case "SpacingY":            p.GridSpacingY         = v; break;
+					case "AxisThickness":       p.AxisThickness        = v; break;
+					case "GridThickness":       p.GridThickness        = v; break;
+					case "SnapDistance":        p.SnapDistance         = v; break;
+					case "ElementSnapDistance": p.ElementSnapDistance  = v; break;
 				}
 				EditorUtility.SetDirty(p);
 			}

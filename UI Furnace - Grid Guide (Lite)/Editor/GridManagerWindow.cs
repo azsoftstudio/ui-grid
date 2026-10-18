@@ -27,16 +27,89 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 
 			var icon = EditorGUIUtility.IconContent("d_GridLayoutGroup Icon");
 			_window.titleContent = new GUIContent("Grid Manager", icon?.image);
+			_window.Focus();
+		}
+
+		public static void ShowWindowAndHighlight()
+		{
+			ShowWindow();
+			if (_window != null)
+			{
+				_window.FlashHighlight();
+			}
+		}
+
+		public void FlashHighlight()
+		{
+			Focus();
+			if (rootVisualElement == null) return;
+
+			var highlightOverlay = rootVisualElement.Q<VisualElement>("window-highlight-border");
+			if (highlightOverlay == null)
+			{
+				highlightOverlay = new VisualElement
+				{
+					name = "window-highlight-border",
+					pickingMode = PickingMode.Ignore,
+					style =
+					{
+						position = Position.Absolute,
+						left = 0, right = 0, top = 0, bottom = 0,
+						borderLeftWidth = 3, borderRightWidth = 3,
+						borderTopWidth = 3, borderBottomWidth = 3,
+						borderLeftColor = new Color(0.22f, 0.58f, 0.94f, 0.95f),
+						borderRightColor = new Color(0.22f, 0.58f, 0.94f, 0.95f),
+						borderTopColor = new Color(0.22f, 0.58f, 0.94f, 0.95f),
+						borderBottomColor = new Color(0.22f, 0.58f, 0.94f, 0.95f),
+						backgroundColor = new Color(0.22f, 0.58f, 0.94f, 0.08f),
+						opacity = 1f
+					}
+				};
+				rootVisualElement.Add(highlightOverlay);
+			}
+			else
+			{
+				highlightOverlay.style.opacity = 1f;
+			}
+
+			highlightOverlay.schedule.Execute(() =>
+			{
+				highlightOverlay.style.opacity = 0f;
+			}).StartingIn(650);
+
+			highlightOverlay.schedule.Execute(() =>
+			{
+				if (highlightOverlay.parent != null)
+					highlightOverlay.RemoveFromHierarchy();
+			}).StartingIn(1100);
 		}
 
 		private void OnEnable()
 		{
 			_window = this;
+			GridSettings.OnSettingsChanged -= OnSettingsChangedHandler;
+			GridSettings.OnSettingsChanged += OnSettingsChangedHandler;
+		}
+
+		private void OnDisable()
+		{
+			GridSettings.OnSettingsChanged -= OnSettingsChangedHandler;
+			if (_window == this) _window = null;
 		}
 
 		private void OnDestroy()
 		{
+			GridSettings.OnSettingsChanged -= OnSettingsChangedHandler;
 			if (_window == this) _window = null;
+		}
+
+		private bool _isUpdatingInternally = false;
+
+		private void OnSettingsChangedHandler()
+		{
+			if (_isUpdatingInternally) return;
+			if (rootVisualElement?.focusController?.focusedElement != null) return;
+			CreateGUI();
 		}
 
 		private static Texture2D FindEditorIcon(params string[] names)
@@ -366,34 +439,7 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 			settingsContainer.Add(_layoutCardSlot);
 
 			// =========================================================================
-			// 4. UI INTERACTION (Snapping UI Elements)
-			// =========================================================================
-			var interactionFoldout = new Foldout { text = "UI Interaction", value = !GridSettings.InteractionCollapsed, style = { marginTop = 8, unityFontStyleAndWeight = FontStyle.Bold } };
-			interactionFoldout.RegisterValueChangedCallback(evt => GridSettings.SaveCollapseState("Interaction", !evt.newValue));
-			settingsContainer.Add(interactionFoldout);
-
-			var interactionGroup = new VisualElement { style = { marginLeft = 15 } };
-			
-			var gridSnapToggleRow = new VisualElement { style = { flexDirection = FlexDirection.Row, alignItems = Align.Center, justifyContent = Justify.SpaceBetween, marginBottom = 8 } };
-			var gridSnapToggleObj = new Toggle("Snap UI Elements to Grid") { value = GridSettings.SnapElementsToGrid, tooltip = "When you drag your UI elements around, they will magnetically snap to your grid lines!" };
-			gridSnapToggleObj.RegisterValueChangedCallback(evt => GridSettings.SaveSnapSettings(GridSettings.SnapToElements, evt.newValue, GridSettings.SnapDistance, GridSettings.ElementSnapDistance));
-			gridSnapToggleRow.Add(gridSnapToggleObj);
-			gridSnapToggleRow.Add(CreateKeycapBadge("Alt+Shift+S", "Toggle Snapping Shortcut (Edit → Shortcuts)"));
-			interactionGroup.Add(gridSnapToggleRow);
-
-			var elemSnapDistField = GridUIHelpers.AddFloatFieldWithRef(interactionGroup, "Element Snap Dist.", "", GridSettings.ElementSnapDistance, (val) => 
-				{ GridSettings.SaveSnapSettings(GridSettings.SnapToElements, GridSettings.SnapElementsToGrid, GridSettings.SnapDistance, Mathf.Clamp(val, 0f, 100f)); });
-			if (elemSnapDistField != null) elemSnapDistField.tooltip = "How close does the UI element need to get before it snaps to the grid? 3 to 10 pixels is usually best.";
-
-			interactionGroup.Add(new Label("This makes moving UI elements easy—they will magnetically snap straight to your grid lines!")
-			{
-				style = { fontSize = 10, opacity = 0.6f, unityFontStyleAndWeight = FontStyle.Italic, whiteSpace = WhiteSpace.Normal, marginTop = 4 }
-			});
-
-			interactionFoldout.Add(interactionGroup);
-
-			// =========================================================================
-			// 5. GRID EDITING (Mode-Specific Editing Tools)
+			// 4. GRID EDITING (Mode-Specific Editing Tools)
 			// =========================================================================
 			var editingFoldout = new Foldout { text = "Grid Editing", value = !GridSettings.EditingCollapsed, style = { marginTop = 8, unityFontStyleAndWeight = FontStyle.Bold } };
 			editingFoldout.RegisterValueChangedCallback(evt => GridSettings.SaveCollapseState("Editing", !evt.newValue));
@@ -433,22 +479,45 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 				var editRow = new VisualElement { style = { flexDirection = FlexDirection.Row, alignItems = Align.Center, justifyContent = Justify.SpaceBetween, marginBottom = 8 } };
 				var editToggle = new Toggle("Edit Grid Lines") { value = GridSettings.IsEditModeActive, tooltip = "Turns on Editing Mode. This lets you add, move, or delete your custom grid lines right inside the Scene view." };
 				editToggle.RegisterValueChangedCallback(evt => { 
-					GridSettings.IsEditModeActive = evt.newValue; 
-					ApplyEditModeStyle(evt.newValue);
-					SceneView.RepaintAll(); 
+					_isUpdatingInternally = true;
+					try
+					{
+						if (evt.newValue)
+						{
+							GridSettings.IsEditModeActive = true;
+							ApplyEditModeStyle(true);
+							GridSettings.TriggerSettingsChanged();
+						}
+						else
+						{
+							GridRenderer.ExitEditMode();
+						}
+					}
+					finally { _isUpdatingInternally = false; }
 				});
 				editRow.Add(editToggle);
 				editingGroup.Add(editRow);
 
 				var addLinesRow = new VisualElement { style = { flexDirection = FlexDirection.Row, justifyContent = Justify.SpaceBetween, marginBottom = 4 } };
 				var addLinesToggle = new Toggle("Pull Guides from Edges") { value = GridRenderer.IsAddLinesMode, tooltip = "Turn this on to click and drag new guides directly from the canvas borders into your layout in the Scene view (Photoshop / Illustrator style)!" };
-				addLinesToggle.RegisterValueChangedCallback(evt => { GridRenderer.IsAddLinesMode = evt.newValue; SceneView.RepaintAll(); });
+				addLinesToggle.RegisterValueChangedCallback(evt => { 
+					_isUpdatingInternally = true;
+					try { GridRenderer.IsAddLinesMode = evt.newValue; GridSettings.TriggerSettingsChanged(); }
+					finally { _isUpdatingInternally = false; }
+				});
 				addLinesRow.Add(addLinesToggle);
 				subToolsGroup.Add(addLinesRow);
 
 				var mirrorRow = new VisualElement { style = { flexDirection = FlexDirection.Row, justifyContent = Justify.SpaceBetween, marginBottom = 4 } };
 				var mirrorToggle = new Toggle("Mirror Mode") { value = GridSettings.IsMirrorModeActive, tooltip = "Turn this on to work symmetrically. When you pull a line to the right, a matching line will automatically appear on the left!" };
-				mirrorToggle.RegisterValueChangedCallback(evt => { GridSettings.IsMirrorModeActive = evt.newValue; SceneView.RepaintAll(); });
+				mirrorToggle.RegisterValueChangedCallback(evt => { 
+					_isUpdatingInternally = true;
+					try {
+						GridSettings.IsMirrorModeActive = evt.newValue; 
+						GridSettings.TriggerSettingsChanged(); 
+					}
+					finally { _isUpdatingInternally = false; }
+				});
 				mirrorRow.Add(mirrorToggle);
 				subToolsGroup.Add(mirrorRow);
 
@@ -462,17 +531,52 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 
 				var snapToggleRow = new VisualElement { style = { flexDirection = FlexDirection.Row, justifyContent = Justify.SpaceBetween, marginBottom = 4 } };
 				var snapToggleObj = new Toggle("Snap Lines to UI") { value = GridSettings.SnapToElements, tooltip = "When you drag a grid line, it will magnetically snap to the edges of your UI elements, making it super easy to align things!" };
-				snapToggleObj.RegisterValueChangedCallback(evt => GridSettings.SaveSnapSettings(evt.newValue, GridSettings.SnapElementsToGrid, GridSettings.SnapDistance, GridSettings.ElementSnapDistance));
+				snapToggleObj.RegisterValueChangedCallback(evt => {
+					_isUpdatingInternally = true;
+					try { GridSettings.SaveSnapSettings(evt.newValue, GridSettings.SnapElementsToGrid, GridSettings.SnapDistance, GridSettings.ElementSnapDistance); }
+					finally { _isUpdatingInternally = false; }
+				});
 				snapToggleRow.Add(snapToggleObj);
 				subToolsGroup.Add(snapToggleRow);
 
-				var snapDistField = GridUIHelpers.AddFloatFieldWithRef(subToolsGroup, "Line Snap Distance", "", GridSettings.SnapDistance, (val) => 
-					{ GridSettings.SaveSnapSettings(GridSettings.SnapToElements, GridSettings.SnapElementsToGrid, Mathf.Clamp(val, 0f, 100f), GridSettings.ElementSnapDistance); });
+				var snapDistField = GridUIHelpers.AddFloatFieldWithRef(subToolsGroup, "Line Snap Distance", "SnapDistance", GridSettings.SnapDistance, (val) => 
+					{ GridSettings.SnapDistance = Mathf.Clamp(val, 0f, 100f); }, minVal: 0f);
 				if (snapDistField != null) snapDistField.tooltip = "How close does your mouse need to get before the line snaps to the UI? 3 to 10 pixels is usually a good setting.";
 
 				ApplyEditModeStyle(GridSettings.IsEditModeActive);
 				editingGroup.Add(subToolsGroup);
 			}
+
+			// =========================================================================
+			// 5. UI INTERACTION (Snapping UI Elements)
+			// =========================================================================
+			var interactionFoldout = new Foldout { text = "UI Interaction", value = !GridSettings.InteractionCollapsed, style = { marginTop = 8, unityFontStyleAndWeight = FontStyle.Bold } };
+			interactionFoldout.RegisterValueChangedCallback(evt => GridSettings.SaveCollapseState("Interaction", !evt.newValue));
+			settingsContainer.Add(interactionFoldout);
+
+			var interactionGroup = new VisualElement { style = { marginLeft = 15 } };
+			
+			var gridSnapToggleRow = new VisualElement { style = { flexDirection = FlexDirection.Row, alignItems = Align.Center, justifyContent = Justify.SpaceBetween, marginBottom = 8 } };
+			var gridSnapToggleObj = new Toggle("Snap UI Elements to Grid") { value = GridSettings.SnapElementsToGrid, tooltip = "When you drag your UI elements around, they will magnetically snap to your grid lines!" };
+			gridSnapToggleObj.RegisterValueChangedCallback(evt => {
+				_isUpdatingInternally = true;
+				try { GridSettings.SaveSnapSettings(GridSettings.SnapToElements, evt.newValue, GridSettings.SnapDistance, GridSettings.ElementSnapDistance); }
+				finally { _isUpdatingInternally = false; }
+			});
+			gridSnapToggleRow.Add(gridSnapToggleObj);
+			gridSnapToggleRow.Add(CreateKeycapBadge("Alt+Shift+S", "Toggle Snapping Shortcut (Edit → Shortcuts)"));
+			interactionGroup.Add(gridSnapToggleRow);
+
+			var elemSnapDistField = GridUIHelpers.AddFloatFieldWithRef(interactionGroup, "Element Snap Dist.", "ElementSnapDistance", GridSettings.ElementSnapDistance, (val) => 
+				{ GridSettings.ElementSnapDistance = Mathf.Clamp(val, 0f, 100f); }, minVal: 0f);
+			if (elemSnapDistField != null) elemSnapDistField.tooltip = "How close does the UI element need to get before it snaps to the grid? 3 to 10 pixels is usually best.";
+
+			interactionGroup.Add(new Label("This makes moving UI elements easy—they will magnetically snap straight to your grid lines!")
+			{
+				style = { fontSize = 10, opacity = 0.6f, unityFontStyleAndWeight = FontStyle.Italic, whiteSpace = WhiteSpace.Normal, marginTop = 4 }
+			});
+
+			interactionFoldout.Add(interactionGroup);
 
 			// =========================================================================
 			// 6. VISUALS & APPEARANCE (The Look)
@@ -522,18 +626,25 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 
 			var resetBtn = new Button(() =>
 			{
-				if (EditorUtility.DisplayDialog(
-					"Reset everything to default?",
-					"This puts all the colors, spacing, and toggles back to how they were when you first installed the tool.\n\nDon't worry, we won't delete your custom lines!\n\nYou can also undo this by pressing Ctrl+Z.",
-					"Reset", "Cancel"))
+				int choice = EditorUtility.DisplayDialogComplex(
+					"Reset Settings",
+					"What would you like to reset?\n\n• Reset Appearance & Snapping:\nKeeps your grid columns, spacing, mode, and custom lines safe. Only resets colors, opacity, thickness, and snapping back to defaults.\n\n• Reset All to Factory Defaults:\nWipes all settings including uniform grid columns, rows, spacing, and mode back to fresh installation state.",
+					"Reset Appearance & Snapping",
+					"Cancel",
+					"Reset All to Factory Defaults");
+
+				if (choice == 0)
 				{
-					GridSettings.ResetAllToDefaults();
-					CreateGUI();
+					GridSettings.ResetAllToDefaults(resetGridLayout: false);
+				}
+				else if (choice == 2)
+				{
+					GridSettings.ResetAllToDefaults(resetGridLayout: true);
 				}
 			})
 			{
-				text = "Reset All Settings",
-				tooltip = "Click to put all settings back to default. Your custom lines are safe!",
+				text = "Reset Settings...",
+				tooltip = "Reset colors, thickness, opacity, and snapping without losing your grid columns, rows, or custom lines",
 				style = { height = 22, opacity = 0.85f }
 			};
 			settingsContainer.Add(resetBtn);
