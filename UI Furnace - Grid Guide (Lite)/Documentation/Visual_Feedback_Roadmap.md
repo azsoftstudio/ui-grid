@@ -91,14 +91,15 @@ This document outlines the complete plan for **Visual Feedback enhancements** (C
 
 ---
 
-### 6. Uniform Grid Visual Enhancements
-* **Grid Spec Overlay Tag:**
-  * Display a subtle floating tag at the top-left or bottom-left of the canvas summarizing the active grid:
-    * `Grid: Fixed 32 × 32 px` or `Columns: 12 | Gutter: 20 px | Margin: 40 px`
-* **Column / Row Index Numbering (Optional Toggle):**
-  * Subtle column numbers (`1`, `2`, `3` ... `12`) above columns in stretch mode to allow instant visual reference during UI assembly.
-* **Hover Cell Highlight:**
-  * Lightly highlight the grid cell currently under the mouse cursor to assist in placing buttons and cards precisely.
+### 6. Uniform Grid Visual Polish & Movable HUD [IMPLEMENTED]
+* **Movable Studio Reading HUD (`DrawMovableSpecHUD`):**
+  * Sleek floating in-scene studio card summarizing active canvas resolution and grid parameters:
+    * `1920 × 1080 px  •  Layout: 12 Col × 8 Row` (or `Grid: 50 × 50 px` or `Guides: 4V | 3H`)
+  * **Zoom-Proof & Fully Movable:** Unlike static corner pins that disappear when zoomed into a button, this HUD is completely movable across the Scene View and persists its screen coordinates (`EditorPrefs`).
+  * **Quick-Hide & Toggle:** Easily hidden via its native `✕` button, and toggled back on with the `Canvas Info` button in the native Scene View Overlay.
+* **Column & Coordinate Numbering Architecture:**
+  * Free-floating number pills on the Canvas top edge were removed to eliminate visual clutter and camera scrolling detachment.
+  * All dimensional readouts, column indices, and pixel coordinates are cleanly consolidated into the upcoming **Canvas Edge Ruler System** (see [Canvas_Edge_Ruler_Specification.md](Canvas_Edge_Ruler_Specification.md)).
 
 ---
 

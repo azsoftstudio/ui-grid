@@ -880,9 +880,14 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 				// Draw position badge on top of all grid lines, axes, and snap highlights
 				DrawPendingPositionBadge();
 
-				// #7 — Scene View HUD: movable GUI window over the scene
+				// Commercial-grade visual enhancement: Movable floating Canvas Spec HUD
+				DrawMovableSpecHUD(localWidth, localHeight);
+
+#if !UNITY_2021_2_OR_NEWER
+				// #7 — Scene View HUD: fallback for Unity 2020 and earlier (Unity 2021.2+ uses native UIFurnaceOverlay)
 				if (GridSettings.CurrentMode == GridMode.CustomLines && GridSettings.IsEditModeActive)
 					DrawEditModeHUD();
+#endif
 			}
 			finally
 			{
@@ -2282,6 +2287,149 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 			s_PendingBadgeText = null;
 		}
 
+		private static Rect s_SpecHUDRect = new Rect(20, 20, 240, 24);
+		private static bool s_SpecHUDInitialized = false;
+		private static GUIStyle s_SpecHUDWindowStyle;
+		private static GUIStyle SpecHUDWindowStyle
+		{
+			get
+			{
+				if (s_SpecHUDWindowStyle == null)
+				{
+					s_SpecHUDWindowStyle = new GUIStyle();
+					s_SpecHUDWindowStyle.padding = new RectOffset(4, 4, 3, 3);
+					s_SpecHUDWindowStyle.border = new RectOffset(0, 0, 0, 0);
+				}
+				return s_SpecHUDWindowStyle;
+			}
+		}
+
+		private static GUIStyle s_SpecHUDTextStyle;
+		private static GUIStyle SpecHUDTextStyle
+		{
+			get
+			{
+				if (s_SpecHUDTextStyle == null)
+				{
+					s_SpecHUDTextStyle = new GUIStyle(EditorStyles.miniBoldLabel)
+					{
+						fontSize = 10,
+						alignment = TextAnchor.MiddleLeft
+					};
+				}
+				return s_SpecHUDTextStyle;
+			}
+		}
+
+		/// <summary>
+		/// Commercial visual enhancement: Movable floating in-scene HUD card summarizing
+		/// active canvas resolution and grid parameters. Stays accessible regardless of zoom.
+		/// </summary>
+		private static void DrawMovableSpecHUD(float localWidth, float localHeight)
+		{
+			if (!GridSettings.ShowCanvasSpecHUD) return;
+
+			SceneView sv = SceneView.currentDrawingSceneView;
+			if (sv == null) return;
+
+			Handles.BeginGUI();
+
+			if (!s_SpecHUDInitialized)
+			{
+				float defaultX = EditorPrefs.GetFloat("UIFurnace_SpecHUD_X", 16f);
+				float defaultY = EditorPrefs.GetFloat("UIFurnace_SpecHUD_Y", 16f);
+				s_SpecHUDRect.x = defaultX;
+				s_SpecHUDRect.y = defaultY;
+				s_SpecHUDInitialized = true;
+			}
+
+			// Format reading text
+			string specText;
+			if (GridSettings.CurrentMode == GridMode.UniformGrid)
+			{
+				if (GridSettings.CurrentSymmetryMode == SymmetryMode.FixedSpacing)
+					specText = $"Grid: {GridSettings.GridSpacingX:0.#} × {GridSettings.GridSpacingY:0.#} px";
+				else
+					specText = $"Layout: {GridSettings.GridColumns} Col × {GridSettings.GridRows} Row";
+			}
+			else
+			{
+				if (GridSettings.CurrentDynamicType == DynamicGridType.StretchWithCanvas)
+					specText = $"Guides: {GridSettings.DynamicStretchX.Count}V | {GridSettings.DynamicStretchY.Count}H (Stretch)";
+				else
+					specText = $"Guides: {GridSettings.DynamicFixedX.Count}V | {GridSettings.DynamicFixedY.Count}H (Fixed)";
+			}
+
+			string fullText = $"{localWidth:0} × {localHeight:0} px  •  {specText}";
+			GUIContent textContent = new GUIContent(fullText);
+
+			Vector2 textSize = SpecHUDTextStyle.CalcSize(textContent);
+			float targetWidth = textSize.x + 50f;
+			float targetHeight = 24f;
+
+			s_SpecHUDRect.width = targetWidth;
+			s_SpecHUDRect.height = targetHeight;
+
+			// Keep window within SceneView bounds
+			s_SpecHUDRect.x = Mathf.Clamp(s_SpecHUDRect.x, 0, Mathf.Max(0, sv.position.width - s_SpecHUDRect.width));
+			s_SpecHUDRect.y = Mathf.Clamp(s_SpecHUDRect.y, 0, Mathf.Max(0, sv.position.height - s_SpecHUDRect.height));
+
+			int controlID = GUIUtility.GetControlID("UIFurnaceSpecHUD".GetHashCode(), FocusType.Passive);
+			s_SpecHUDRect = GUILayout.Window(controlID, s_SpecHUDRect, id => SpecHUDWindowContent(id, textContent), GUIContent.none, SpecHUDWindowStyle);
+
+			if (Event.current.type == EventType.MouseUp)
+			{
+				EditorPrefs.SetFloat("UIFurnace_SpecHUD_X", s_SpecHUDRect.x);
+				EditorPrefs.SetFloat("UIFurnace_SpecHUD_Y", s_SpecHUDRect.y);
+			}
+
+			Handles.EndGUI();
+		}
+
+		private static void SpecHUDWindowContent(int id, GUIContent textContent)
+		{
+			Rect totalRect = new Rect(0, 0, s_SpecHUDRect.width, s_SpecHUDRect.height);
+
+			// 1. Subtle drop shadow
+			EditorGUI.DrawRect(new Rect(totalRect.x + 1f, totalRect.y + 1f, totalRect.width, totalRect.height), new Color(0f, 0f, 0f, 0.4f));
+
+			// 2. Studio background adapting to skin
+			Color bg = EditorGUIUtility.isProSkin
+				? new Color(0.14f, 0.14f, 0.16f, 0.94f)
+				: new Color(0.85f, 0.85f, 0.88f, 0.94f);
+			EditorGUI.DrawRect(totalRect, bg);
+
+			// 3. Crisp border
+			Color borderColor = EditorGUIUtility.isProSkin
+				? new Color(0.35f, 0.35f, 0.38f, 0.7f)
+				: new Color(0.55f, 0.55f, 0.6f, 0.7f);
+			DrawBadgeBorder(totalRect, 1f, borderColor);
+
+			// Content Row
+			GUILayout.BeginHorizontal();
+
+			// Grip
+			GUILayout.Label(new GUIContent("⠿", "Drag to reposition Canvas Info"), EditorStyles.miniLabel, GUILayout.Width(12), GUILayout.Height(16));
+
+			// Text
+			SpecHUDTextStyle.normal.textColor = EditorGUIUtility.isProSkin ? new Color(0.9f, 0.9f, 0.92f, 1f) : new Color(0.12f, 0.12f, 0.14f, 1f);
+			GUILayout.Label(textContent, SpecHUDTextStyle, GUILayout.Height(16));
+
+			GUILayout.FlexibleSpace();
+
+			// Hide Button
+			if (GUILayout.Button(new GUIContent("✕", "Hide Canvas Info"), EditorStyles.miniLabel, GUILayout.Width(14), GUILayout.Height(16)))
+			{
+				GridSettings.ShowCanvasSpecHUD = false;
+				if (SceneView.currentDrawingSceneView != null) SceneView.currentDrawingSceneView.Repaint();
+			}
+
+			GUILayout.EndHorizontal();
+
+			// Drag window
+			GUI.DragWindow(new Rect(0, 0, totalRect.width - 20f, totalRect.height));
+		}
+
 		/// <summary>
 		/// #10 — Draw an offset label next to the hovered/dragged line so the user
 		/// always knows its exact pixel position from center.
@@ -2896,7 +3044,7 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 				win.CreateGUI();
 		}
 
-		private static void ExitEditMode()
+		public static void ExitEditMode()
 		{
 			GridSettings.IsEditModeActive   = false;
 			GridSettings.IsMirrorModeActive = false; // #8 reset mirror on exit

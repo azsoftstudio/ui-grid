@@ -44,6 +44,11 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 		// ShowGrid is outside of the profile — it is an editor-wide view toggle
 		public static bool  ShowGrid      { get; set; } = true;
 		public static float GridOpacity   { get; set; } = 1f;
+		public static bool  ShowCanvasSpecHUD
+		{
+			get => EditorPrefs.GetBool("UIFurnace_ShowCanvasSpecHUD", true);
+			set => EditorPrefs.SetBool("UIFurnace_ShowCanvasSpecHUD", value);
+		}
 
 		// ─── Snapping State ────────────────────────────────────────────────────
 		public static bool  SnapToElements { get; set; } = true;
