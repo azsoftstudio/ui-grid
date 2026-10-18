@@ -448,6 +448,13 @@ namespace AZSoftStudio.UIFurnace.LayoutDesigner
 			}
 		}
 
+		/// <summary>
+		/// Overload used by Interaction.cs drag/add-line paths.
+		/// Uses <see cref="GridSettings.SnapDistance"/> (Line Snap Distance) as the threshold.
+		/// </summary>
+		private static float ApplySnap(float rawProj, List<float> snapLines, List<RectTransform> snapSources)
+			=> ApplySnap(rawProj, snapLines, snapSources, GridSettings.SnapDistance);
+
 		private static float ApplySnap(float rawProj, List<float> snapLines, List<RectTransform> snapSources, float snapThreshold)
 		{
 			if (snapLines == null || snapLines.Count == 0) return rawProj;

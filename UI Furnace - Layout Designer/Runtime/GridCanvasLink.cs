@@ -21,7 +21,13 @@ namespace AZSoftStudio.UIFurnace.LayoutDesigner
 			set => _profile = value;
 		}
 
-		/// <summary>Quick helper to get the Canvas component this link is attached to.</summary>
-		public Canvas Canvas => GetComponent<Canvas>();
+		/// <summary>
+		/// The Canvas this link is attached to.
+		/// Cached on <c>Awake</c> and <c>OnValidate</c> — never calls GetComponent at runtime.
+		/// </summary>
+		public Canvas Canvas { get; private set; }
+
+		private void Awake()     => Canvas = GetComponent<Canvas>();
+		private void OnValidate() => Canvas = GetComponent<Canvas>();
 	}
 }

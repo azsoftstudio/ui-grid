@@ -95,7 +95,7 @@ namespace AZSoftStudio.UIFurnace.LayoutDesigner
 			GUILayout.Label(new GUIContent("â ¿", "Drag to reposition toolbar"), EditorStyles.miniLabel, GUILayout.Width(14));
 
 			// Green LED Status Dot
-			var defColor = GUI.color;
+			Color defColor = GUI.color;
 			GUI.color = new Color(0.2f, 0.85f, 0.4f, 1f);
 			GUILayout.Label("â—", EditorStyles.boldLabel, GUILayout.Width(12));
 			GUI.color = defColor;
@@ -439,20 +439,20 @@ namespace AZSoftStudio.UIFurnace.LayoutDesigner
 			GUI.DragWindow(new Rect(0, 0, totalRect.width - 20f, totalRect.height));
 		}
 
-		/// <summary>
-		/// #10 â€” Draw an offset label next to the hovered/dragged line so the user
-		/// always knows its exact pixel position from center.
-		/// </summary>
-		private static void DrawLineOffsetLabel(Vector3 mouseWorldPos,
-			float rawOffset, float canvasSize, float localSize, string axis)
-		{
-			float px = GridSettings.CurrentDynamicType == DynamicGridType.FixedPosition
-				? rawOffset / (localSize > 0.001f ? (canvasSize / localSize) : 1f)
-				: (Mathf.Clamp01(rawOffset) - 0.5f) * localSize;   // stretch t -> pixels from center
-			string sign = px >= 0 ? "+" : "";
 
-			DrawPositionBadge(mouseWorldPos, $"{axis}: {sign}{px:F0} px");
-		}
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 	}
 }

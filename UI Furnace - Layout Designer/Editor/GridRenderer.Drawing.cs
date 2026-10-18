@@ -45,7 +45,7 @@ namespace AZSoftStudio.UIFurnace.LayoutDesigner
 		{
 			float t = Mathf.Max(1f, Mathf.Round(screenThickness));
 
-			if (t <= 1f)
+			if (t == 1f)
 			{
 				Handles.DrawLine(p1, p2);
 			}

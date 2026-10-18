@@ -1,4 +1,4 @@
-﻿#if UNITY_EDITOR
+#if UNITY_EDITOR
 using UnityEngine;
 using UnityEditor;
 using System.Collections.Generic;
@@ -10,24 +10,19 @@ namespace AZSoftStudio.UIFurnace.LayoutDesigner
 	/// </summary>
 	public static partial class GridRenderer
 	{
-		// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Drag State Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
-		private static int s_DragIndexX = -1;
-		private static int s_DragIndexY = -1;
-		private enum DragMode { None, Move, Resize }
-		private static DragMode s_CurrentDragMode = DragMode.None;
-		private static int s_MirrorDragIndexX = -1;
-		private static int s_MirrorDragIndexY = -1;
-		private static bool s_IsDragging = false;
-		private static bool s_IsShiftDown = false;
-		private static bool s_IsAltDown = false;
+		// ─── Drag & Hover State ───────────────────────────────────────────────────────
+		private static int      s_DragIndexX       = -1;
+		private static int      s_DragIndexY       = -1;
+		private static int      s_MirrorDragIndexX = -1;
+		private static int      s_MirrorDragIndexY = -1;
+		private static int      s_HoverIndexX      = -1;
+		private static int      s_HoverIndexY      = -1;
+		private static bool     s_IsDragging       = false;
+		private static bool     s_IsShiftDown      = false;
+		private static bool     s_IsAltDown        = false;
+		private static DragMode s_CurrentDragMode  = DragMode.None;
 
-		private static bool IsMirroredValue(float val1, float val2, bool isFixed)
-		{
-			float target = isFixed ? -val1 : (1f - val1);
-			return Mathf.Abs(val2 - target) < 0.001f;
-		}
-		private static int s_HoverIndexX = -1;
-		private static int s_HoverIndexY = -1;
+		private enum DragMode { None, Move, Resize }
 		
 		private static bool s_IsAddingLine = false;
 		private static bool s_AddingLineIsVertical = false;
@@ -44,7 +39,7 @@ namespace AZSoftStudio.UIFurnace.LayoutDesigner
 			if (SceneView.lastActiveSceneView != null) SceneView.lastActiveSceneView.Repaint();
 		}
 
-		// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Add Lines Mode (Drag from Axis) State Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+		// ─── Add Lines Mode (Drag from Axis) State ──────────────────────────────────────
 		/// <summary>When true, users can drag from the canvas edges to pull out a new horizontal/vertical guide.</summary>
 		public static bool IsAddLinesMode { get; set; } = false;
 		private static bool s_IsAxisDragging = false;     // True while mid-drag creating a new line
@@ -54,9 +49,23 @@ namespace AZSoftStudio.UIFurnace.LayoutDesigner
 		private static bool s_HoverEdgeTop = false;       // Specifically top edge
 		private static bool s_HoverEdgeLeft = false;      // Specifically left edge
 
-		// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Selection State (Transient) Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+		// ─── Selection State (Transient) ────────────────────────────────────────────────
 		public static readonly List<int> SelectedIndicesX = new List<int>();
 		public static readonly List<int> SelectedIndicesY = new List<int>();
+
+		// ─── Helpers ─────────────────────────────────────────────────────────────────────
+
+		/// <summary>
+		/// Returns <c>true</c> when <paramref name="val2"/> is the symmetric mirror of
+		/// <paramref name="val1"/> on the canvas.<br/>
+		/// Fixed-position mode: mirror = <c>-val</c>.<br/>
+		/// Stretch mode: mirror = <c>1 − val</c>.
+		/// </summary>
+		private static bool IsMirroredValue(float val1, float val2, bool isFixed)
+		{
+			float target = isFixed ? -val1 : (1f - val1);
+			return Mathf.Abs(val2 - target) < 0.001f;
+		}
 
 		private static void HandleDynamicGridEvents(Event e, int controlID, Vector3 BL, Vector3 TL, Vector3 TR, Vector3 BR, float localWidth, float localHeight)
 		{
@@ -245,8 +254,7 @@ namespace AZSoftStudio.UIFurnace.LayoutDesigner
 						DrawPositionBadge(mouseWorldPos, $"Y: {(pxOffY >= 0 ? "+" : "")}{pxOffY:F0} px");
 					}
 
-					// Snap highlight is drawn after DrawDynamicGrid in OnSceneGUI to ensure it's always on top.
-					// Nothing to draw here.
+					// Snap highlights are drawn after DrawDynamicGrid in OnSceneGUI — they're always on top.
 				}
 				else if (e.type == EventType.MouseDown && e.button == 0)
 				{
@@ -299,7 +307,7 @@ namespace AZSoftStudio.UIFurnace.LayoutDesigner
 				return; // Skip normal hover/drag logic while adding a line
 			} // end s_IsAddingLine
 
-			// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Add Lines Mode: Drag from Axis to Create New Line Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+			// ─── Add Lines Mode: Drag from Axis to Create New Line ──────────────────────────
 			if (IsAddLinesMode && !s_IsAxisDragging)
 			{
 				float distTop    = HandleUtility.DistanceToLine(TL, TR);
@@ -694,14 +702,16 @@ namespace AZSoftStudio.UIFurnace.LayoutDesigner
 					if (s_SnapWorldLinesX.Count == 0 && s_SnapWorldLinesY.Count == 0)
 						PrepareSnapLines(center, right, up);
 
-					if (s_DragIndexX != -1) 
+					if (s_DragIndexX != -1)
 					{
 						EditorGUIUtility.AddCursorRect(cursorRect, MouseCursor.ResizeHorizontal, controlID);
+						// Side-effect: populates s_SnapHighlightedRects so snap brackets render this frame.
 						ApplySnap(Vector3.Dot(mouseWorldPos - center, right), s_SnapWorldLinesX, s_SnapSourcesX);
 					}
-					if (s_DragIndexY != -1) 
+					if (s_DragIndexY != -1)
 					{
 						EditorGUIUtility.AddCursorRect(cursorRect, MouseCursor.ResizeVertical, controlID);
+						// Side-effect: populates s_SnapHighlightedRects so snap brackets render this frame.
 						ApplySnap(Vector3.Dot(mouseWorldPos - center, up), s_SnapWorldLinesY, s_SnapSourcesY);
 					}
 				}

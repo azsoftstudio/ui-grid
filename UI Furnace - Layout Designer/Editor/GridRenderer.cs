@@ -1,4 +1,4 @@
-﻿#if UNITY_EDITOR
+#if UNITY_EDITOR
 using UnityEngine;
 using UnityEditor;
 using UnityEditor.ShortcutManagement;
@@ -222,8 +222,10 @@ namespace AZSoftStudio.UIFurnace.LayoutDesigner
 		{
 			if (Event.current != null)
 			{
+				// Reserved scaffolding: modifier-key state for planned features
+				// (Shift = constrain drag to one axis, Alt = duplicate line on drop)
 				s_IsShiftDown = Event.current.shift;
-				s_IsAltDown = Event.current.alt;
+				s_IsAltDown   = Event.current.alt;
 			}
 
 			s_SnapHighlightedRects.Clear();

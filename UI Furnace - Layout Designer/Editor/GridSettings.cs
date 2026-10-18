@@ -114,12 +114,15 @@ namespace AZSoftStudio.UIFurnace.LayoutDesigner
 		/// </summary>
 		public static void LoadCurrentSettings()
 		{
+			var asset = GridSettingsAsset.instance;
+			if (asset == null) return; // Guard: asset not yet initialized (e.g. fresh import before AssetDatabase is ready)
+
 			// ShowGrid is strictly editor-wide
-			ShowGrid = GridSettingsAsset.instance.ShowGrid;
-			MainSettingsCollapsed = GridSettingsAsset.instance.LayoutCollapsed;
-			InteractionCollapsed  = GridSettingsAsset.instance.SnappingCollapsed;
-			EditingCollapsed      = GridSettingsAsset.instance.EditingCollapsed;
-			VisualsCollapsed      = GridSettingsAsset.instance.ColorsCollapsed;
+			ShowGrid = asset.ShowGrid;
+			MainSettingsCollapsed = asset.LayoutCollapsed;
+			InteractionCollapsed  = asset.SnappingCollapsed;
+			EditingCollapsed      = asset.EditingCollapsed;
+			VisualsCollapsed      = asset.ColorsCollapsed;
 
 			if (ActiveProfile != null)
 			{
@@ -615,7 +618,7 @@ namespace AZSoftStudio.UIFurnace.LayoutDesigner
 					ActiveProfile.GridSpacingY = sy;
 					MarkProfileDirty();
 				}
-				var a = GridSettingsAsset.instance; a.GridSpacingX = sx; a.GridSpacingY = sy;
+				var a = GridSettingsAsset.instance; a.GridSpacingX = sx; a.GridSpacingY = sy; a.SaveToDisk();
 			});
 		}
 
@@ -632,7 +635,7 @@ namespace AZSoftStudio.UIFurnace.LayoutDesigner
 					ActiveProfile.GridRows = r;
 					MarkProfileDirty();
 				}
-				var a = GridSettingsAsset.instance; a.GridColumns = c; a.GridRows = r;
+				var a = GridSettingsAsset.instance; a.GridColumns = c; a.GridRows = r; a.SaveToDisk();
 			});
 		}
 

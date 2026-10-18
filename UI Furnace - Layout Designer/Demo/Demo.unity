@@ -229,7 +229,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 6ae6d920bf2f2954dae78bb3328d02e0, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: AZSoftStudio.UIFurnace.LayoutDesigner.Runtime::AZSoftStudio.UIFurnace.LayoutDesigner.GridCanvasLink
+  m_EditorClassIdentifier: AZSoftStudio.UIFurnace.GridGuide.Runtime::AZSoftStudio.UIFurnace.GridGuide.GridCanvasLink
   _profile: {fileID: 11400000, guid: 89e83e5a12387114e83c27fbe18d4b94, type: 2}
 --- !u!114 &364815219
 MonoBehaviour:
@@ -431,7 +431,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 2df8003d5cb584e4583d12da72547c4a, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: AZSoftStudio.UIFurnace.LayoutDesigner.Runtime::AZSoftStudio.UIFurnace.LayoutDesigner.GridCanvasLink
+  m_EditorClassIdentifier: AZSoftStudio.UIFurnace.GridGuide.Runtime::AZSoftStudio.UIFurnace.GridGuide.GridCanvasLink
   _profile: {fileID: 11400000, guid: 156f512ab2a135e4e91b0f68736c5f84, type: 2}
 --- !u!114 &383839338
 MonoBehaviour:
@@ -444,7 +444,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 6ae6d920bf2f2954dae78bb3328d02e0, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: AZSoftStudio.UIFurnace.LayoutDesigner.Runtime::AZSoftStudio.UIFurnace.LayoutDesigner.GridCanvasLink
+  m_EditorClassIdentifier: AZSoftStudio.UIFurnace.GridGuide.Runtime::AZSoftStudio.UIFurnace.GridGuide.GridCanvasLink
   _profile: {fileID: 11400000, guid: abdff88ca9c6c6944bde816aa4c1cd21, type: 2}
 --- !u!1 &453201968
 GameObject:
@@ -473,7 +473,7 @@ RectTransform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 453201968}
   m_LocalRotation: {x: -0.009162936, y: 0, z: 0, w: 0.99995804}
-  m_LocalPosition: {x: 0, y: 0, z: -17.6258}
+  m_LocalPosition: {x: 0, y: 0, z: -17.9336}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -481,8 +481,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: -1.05, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: -346.2156, y: -45.057205}
-  m_SizeDelta: {x: 129.24992, y: 144.38885}
+  m_AnchoredPosition: {x: -415.02667, y: -53.981506}
+  m_SizeDelta: {x: 154.93858, y: 107.9811}
   m_Pivot: {x: 0.49999997, y: 0.50000006}
 --- !u!114 &453201970
 MonoBehaviour:
@@ -823,7 +823,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: 'UI Furnace: Layout Designer is an editor tool for Unity that adds a precision
+  m_text: 'UI Furnace Grid Guide (Lite) is an editor tool for Unity that adds a precision
     grid and snapping system to the UI workflow, making it easier to design clean,
     well-aligned interfaces.
 
