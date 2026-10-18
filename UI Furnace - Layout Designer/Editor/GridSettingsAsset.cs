@@ -3,13 +3,13 @@ using UnityEngine;
 using UnityEditor;
 using System.Collections.Generic;
 
-namespace AZSoftStudio.UIFurnace.GridGuide
+namespace AZSoftStudio.UIFurnace.LayoutDesigner
 {
 	/// <summary>
 	/// ScriptableSingleton that persists all grid settings to UserSettings/.
 	/// Replaces EditorPrefs, enabling Undo/Redo support via Undo.RecordObject.
 	/// </summary>
-	[FilePath("UserSettings/UIFurnaceGridGuide.asset", FilePathAttribute.Location.ProjectFolder)]
+	[FilePath("UserSettings/UIFurnaceLayoutDesigner.asset", FilePathAttribute.Location.ProjectFolder)]
 	internal sealed class GridSettingsAsset : ScriptableSingleton<GridSettingsAsset>
 	{
 		[SerializeField] internal Color GridColor     = new Color(0.3f, 0.7f, 1f,   0.25f);

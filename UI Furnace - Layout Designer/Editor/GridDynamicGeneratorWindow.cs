@@ -6,38 +6,38 @@ using UnityEditor.UIElements;
 using System.Globalization;
 using System.Collections.Generic;
 
-namespace AZSoftStudio.UIFurnace.GridGuide
+namespace AZSoftStudio.UIFurnace.LayoutDesigner
 {
 	/// <summary>
-	/// Sub-window opened from the main Grid Manager.
+	/// Sub-window opened from the main Layout Designer.
 	/// Generates template grid lines and pushes them into the Dynamic array.
 	/// </summary>
 	public class GridDynamicGeneratorWindow : EditorWindow
 	{
 		private SymmetryMode _genMode 
 		{ 
-			get => (SymmetryMode)EditorPrefs.GetInt("GridGuide_GenMode", (int)SymmetryMode.StretchWithCanvas);
-			set => EditorPrefs.SetInt("GridGuide_GenMode", (int)value);
+			get => (SymmetryMode)EditorPrefs.GetInt("LayoutDesigner_GenMode", (int)SymmetryMode.StretchWithCanvas);
+			set => EditorPrefs.SetInt("LayoutDesigner_GenMode", (int)value);
 		}
 		private float _spacingX
 		{
-			get => EditorPrefs.GetFloat("GridGuide_GenSpacingX", 50f);
-			set => EditorPrefs.SetFloat("GridGuide_GenSpacingX", value);
+			get => EditorPrefs.GetFloat("LayoutDesigner_GenSpacingX", 50f);
+			set => EditorPrefs.SetFloat("LayoutDesigner_GenSpacingX", value);
 		}
 		private float _spacingY
 		{
-			get => EditorPrefs.GetFloat("GridGuide_GenSpacingY", 50f);
-			set => EditorPrefs.SetFloat("GridGuide_GenSpacingY", value);
+			get => EditorPrefs.GetFloat("LayoutDesigner_GenSpacingY", 50f);
+			set => EditorPrefs.SetFloat("LayoutDesigner_GenSpacingY", value);
 		}
 		private int _cols
 		{
-			get => EditorPrefs.GetInt("GridGuide_GenCols", 10);
-			set => EditorPrefs.SetInt("GridGuide_GenCols", value);
+			get => EditorPrefs.GetInt("LayoutDesigner_GenCols", 10);
+			set => EditorPrefs.SetInt("LayoutDesigner_GenCols", value);
 		}
 		private int _rows
 		{
-			get => EditorPrefs.GetInt("GridGuide_GenRows", 10);
-			set => EditorPrefs.SetInt("GridGuide_GenRows", value);
+			get => EditorPrefs.GetInt("LayoutDesigner_GenRows", 10);
+			set => EditorPrefs.SetInt("LayoutDesigner_GenRows", value);
 		}
 		
 		public static void ShowWindow()
@@ -70,7 +70,7 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 			{
 				var warnBox = new IMGUIContainer(() =>
 				{
-					EditorGUILayout.HelpBox("Grid Mode is currently set to Uniform Grid. Switch Grid Mode to Custom Lines in Grid Manager to generate and edit custom lines.", MessageType.Info);
+					EditorGUILayout.HelpBox("Grid Mode is currently set to Uniform Grid. Switch Grid Mode to Custom Lines in Layout Designer to generate and edit custom lines.", MessageType.Info);
 				});
 				root.Add(warnBox);
 			}
@@ -220,7 +220,7 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 
 			GridSettings.SaveDynamicLists();
 			SceneView.RepaintAll();
-			GridManagerWindow.Instance?.CreateGUI();
+			LayoutDesignerWindow.Instance?.CreateGUI();
 		}
 
 		private void ClearOffCanvasLines()
@@ -253,7 +253,7 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 
 				GridSettings.SaveDynamicLists();
 				SceneView.RepaintAll();
-				GridManagerWindow.Instance?.CreateGUI();
+				LayoutDesignerWindow.Instance?.CreateGUI();
 			}
 		}
 
@@ -266,7 +266,7 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 				GridSettings.DynamicFixedX.Clear();   GridSettings.DynamicFixedY.Clear();
 				GridSettings.SaveDynamicLists();
 				SceneView.RepaintAll();
-				foreach (var win in Resources.FindObjectsOfTypeAll<GridManagerWindow>()) win.CreateGUI();
+				foreach (var win in Resources.FindObjectsOfTypeAll<LayoutDesignerWindow>()) win.CreateGUI();
 			}
 		}
 	}

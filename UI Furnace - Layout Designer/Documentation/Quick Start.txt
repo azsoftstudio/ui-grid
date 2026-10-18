@@ -2,7 +2,7 @@
 
 Quick Start:
 1. Open Unity
-2. Go to Tools → UI Furnace → Grid Manager
+2. Go to Tools → UI Furnace → Layout Designer
 3. Enable Grid
 4. Choose a grid mode
 5. Start moving UI elements

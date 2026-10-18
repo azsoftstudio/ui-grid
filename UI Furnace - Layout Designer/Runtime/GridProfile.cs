@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace AZSoftStudio.UIFurnace.GridGuide
+namespace AZSoftStudio.UIFurnace.LayoutDesigner
 {
 	/// <summary>Sub-modes for Symmetry grid.</summary>
 	public enum SymmetryMode { FixedSpacing, StretchWithCanvas }
@@ -14,7 +14,7 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 
 	/// <summary>
 	/// ScriptableObject storing grid guidelines, colors, spacing, and snapping settings for a Canvas.
-	/// Live editing is performed via the Grid Manager window.
+	/// Live editing is performed via the Layout Designer window.
 	/// </summary>
 	[CreateAssetMenu(fileName = "New Grid Profile", menuName = "UI Furnace/Grid Profile", order = 100)]
 	public class GridProfile : ScriptableObject

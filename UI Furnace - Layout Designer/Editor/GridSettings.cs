@@ -3,7 +3,7 @@ using UnityEngine;
 using UnityEditor;
 using System.Collections.Generic;
 
-namespace AZSoftStudio.UIFurnace.GridGuide
+namespace AZSoftStudio.UIFurnace.LayoutDesigner
 {
 	/// <summary>
 	/// Manages grid settings. Connects the active Canvas's GridProfile with live editor state.
@@ -75,7 +75,7 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 		// ─── Undo/Redo & Synchronization ──────────────────────────────────────
 		/// <summary>
 		/// Event raised whenever any grid setting, visibility, or mode is changed,
-		/// ensuring GridManagerWindow and Scene View Overlay stay in sync.
+		/// ensuring LayoutDesignerWindow and Scene View Overlay stay in sync.
 		/// </summary>
 		public static event System.Action OnSettingsChanged;
 
@@ -95,7 +95,7 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 			LoadCurrentSettings();
 			SceneView.RepaintAll();
 
-			foreach (var win in Resources.FindObjectsOfTypeAll<GridManagerWindow>())
+			foreach (var win in Resources.FindObjectsOfTypeAll<LayoutDesignerWindow>())
 				win.CreateGUI();
 		}
 
@@ -239,7 +239,7 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 			LoadCurrentSettings();
 			SceneView.RepaintAll();
 
-			foreach (var win in Resources.FindObjectsOfTypeAll<GridManagerWindow>())
+			foreach (var win in Resources.FindObjectsOfTypeAll<LayoutDesignerWindow>())
 			{
 				win.CreateGUI();
 			}
@@ -258,7 +258,7 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 			LoadCurrentSettings();
 			SceneView.RepaintAll();
 
-			foreach (var win in Resources.FindObjectsOfTypeAll<GridManagerWindow>())
+			foreach (var win in Resources.FindObjectsOfTypeAll<LayoutDesignerWindow>())
 			{
 				win.CreateGUI();
 			}
@@ -272,7 +272,7 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 		{
 			if (canvas == null) return null;
 
-			string folderPath = "Assets/AZSoftStudio/UI Furnace - Grid Guide (Lite)/Profiles";
+			string folderPath = "Assets/AZSoftStudio/UI Furnace - Layout Designer/Profiles";
 			EnsureFolderExists(folderPath);
 
 			string rawName = string.IsNullOrEmpty(customName) ? canvas.gameObject.name : customName;
@@ -316,7 +316,7 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 
 			if (refreshWindow)
 			{
-				foreach (var win in Resources.FindObjectsOfTypeAll<GridManagerWindow>())
+				foreach (var win in Resources.FindObjectsOfTypeAll<LayoutDesignerWindow>())
 					win.CreateGUI();
 			}
 		}
@@ -325,7 +325,7 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 		{
 			if (ActiveProfile == null || ActiveCanvas == null) return null;
 
-			string folderPath = "Assets/AZSoftStudio/UI Furnace - Grid Guide (Lite)/Profiles";
+			string folderPath = "Assets/AZSoftStudio/UI Furnace - Layout Designer/Profiles";
 			EnsureFolderExists(folderPath);
 
 			string baseName = string.IsNullOrEmpty(newName) ? $"{ActiveProfile.name}_Copy" : newName;

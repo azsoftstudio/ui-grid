@@ -1,6 +1,6 @@
 using UnityEngine;
 
-namespace AZSoftStudio.UIFurnace.GridGuide
+namespace AZSoftStudio.UIFurnace.LayoutDesigner
 {
 	/// <summary>
 	/// Attaches to a Canvas GameObject to link it with its dedicated GridProfile.

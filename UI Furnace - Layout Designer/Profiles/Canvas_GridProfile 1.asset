@@ -11,7 +11,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: d7139f429b82ce341b02008883aef1bc, type: 3}
   m_Name: Canvas_GridProfile 1
-  m_EditorClassIdentifier: AZSoftStudio.UIFurnace.GridGuide.Runtime::AZSoftStudio.UIFurnace.GridGuide.GridProfile
+  m_EditorClassIdentifier: AZSoftStudio.UIFurnace.LayoutDesigner.Runtime::AZSoftStudio.UIFurnace.LayoutDesigner.GridProfile
   GridColor: {r: 0.3, g: 0.7, b: 1, a: 0.25}
   XAxisColor: {r: 1, g: 0.3, b: 0.3, a: 0.8}
   YAxisColor: {r: 0.3, g: 1, b: 0.3, a: 0.8}

@@ -4,7 +4,7 @@ using UnityEditor;
 using UnityEditor.ShortcutManagement;
 using System.Collections.Generic;
 
-namespace AZSoftStudio.UIFurnace.GridGuide
+namespace AZSoftStudio.UIFurnace.LayoutDesigner
 {
 	/// <summary>
 	/// Handles grid rendering in the Scene View.
@@ -25,7 +25,7 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 
 		/// <summary>
 		/// True when the selected object lives under a WorldSpace canvas (grid not supported there).
-		/// Used by GridManagerWindow to show a contextual warning.
+		/// Used by LayoutDesignerWindow to show a contextual warning.
 		/// </summary>
 		public static bool IsWorldSpaceCanvas { get; private set; }
 
@@ -3113,7 +3113,7 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 
 		private static void RefreshOpenWindows()
 		{
-			foreach (var win in Resources.FindObjectsOfTypeAll<GridManagerWindow>())
+			foreach (var win in Resources.FindObjectsOfTypeAll<LayoutDesignerWindow>())
 				win.CreateGUI();
 		}
 

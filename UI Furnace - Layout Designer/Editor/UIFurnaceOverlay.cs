@@ -4,15 +4,15 @@ using UnityEditor.Overlays;
 using UnityEngine;
 using UnityEngine.UIElements;
 
-namespace AZSoftStudio.UIFurnace.GridGuide
+namespace AZSoftStudio.UIFurnace.LayoutDesigner
 {
 	/// <summary>
-	/// Native Unity Scene View Overlay for UI Furnace Grid Guide.
+	/// Native Unity Scene View Overlay for UI Furnace Layout Designer.
 	/// Appears directly in Unity's native Scene View Overlay menu (under Custom).
 	/// Can be docked anywhere in the Scene View or floated natively by Unity.
 	/// Grouped logically into Status, Assist Toggles, Guide Tools, Danger Zone, and Finish actions.
 	/// </summary>
-	[Overlay(typeof(SceneView), "ui-furnace-grid", "UI Furnace Grid", defaultDisplay = true)]
+	[Overlay(typeof(SceneView), "ui-furnace-layout-designer", "UI Furnace Layout Designer", defaultDisplay = true)]
 	public class UIFurnaceOverlay : Overlay, ITransientOverlay
 	{
 		// Visible when grid display is enabled and either Edit Mode is active or a Canvas is selected
@@ -253,9 +253,9 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 					}
 					else
 					{
-						if (GUILayout.Button(new GUIContent("⚙ Settings", "Open and focus UI Furnace Grid Manager Window"), s_ButtonNormalStyle, GUILayout.Height(20)))
+						if (GUILayout.Button(new GUIContent("⚙ Settings", "Open and focus UI Furnace Layout Designer Window"), s_ButtonNormalStyle, GUILayout.Height(20)))
 						{
-							GridManagerWindow.ShowWindowAndHighlight();
+							LayoutDesignerWindow.ShowWindowAndHighlight();
 						}
 					}
 				}

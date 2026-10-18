@@ -1,7 +1,8 @@
 {
-    "name": "AZSoftStudio.UIFurnace.GridGuide.Editor",
+    "name": "AZSoftStudio.UIFurnace.LayoutDesigner.Editor",
+    "rootNamespace": "AZSoftStudio.UIFurnace.LayoutDesigner",
     "references": [
-        "AZSoftStudio.UIFurnace.GridGuide.Runtime"
+        "AZSoftStudio.UIFurnace.LayoutDesigner.Runtime"
     ],
     "includePlatforms": [
         "Editor"

@@ -1,6 +1,6 @@
 {
-    "name": "AZSoftStudio.UIFurnace.GridGuide.Runtime",
-    "rootNamespace": "AZSoftStudio.UIFurnace.GridGuide",
+    "name": "AZSoftStudio.UIFurnace.LayoutDesigner.Runtime",
+    "rootNamespace": "AZSoftStudio.UIFurnace.LayoutDesigner",
     "references": [],
     "includePlatforms": [],
     "excludePlatforms": [],

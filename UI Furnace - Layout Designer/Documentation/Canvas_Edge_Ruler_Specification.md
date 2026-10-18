@@ -1,4 +1,4 @@
-# UI Furnace - Grid Guide
+# UI Furnace: Layout Designer
 ## Canvas Edge Ruler System & Guide Pull Architecture
 ### Commercial-Grade Specification & Market Strategy
 

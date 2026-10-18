@@ -5,28 +5,28 @@ using UnityEngine.UIElements;
 using UnityEditor.UIElements;
 using System.Globalization;
 
-namespace AZSoftStudio.UIFurnace.GridGuide
+namespace AZSoftStudio.UIFurnace.LayoutDesigner
 {
 	/// <summary>
-	/// Main editor window for grid management.
+	/// Main editor window for Layout Designer.
 	/// </summary>
-	public class GridManagerWindow : EditorWindow
+	public class LayoutDesignerWindow : EditorWindow
 	{
-		private static GridManagerWindow _window;
-		internal static GridManagerWindow Instance => _window;
+		private static LayoutDesignerWindow _window;
+		internal static LayoutDesignerWindow Instance => _window;
 		private VisualElement _layoutCardSlot;
 		private ObjectField _profileField;
 		private VisualElement _profileActionsSlot;
 		private VisualElement _settingsContainer;
 
-		[MenuItem("Tools/UI Furnace/Grid Manager", false, 0)]
+		[MenuItem("Tools/UI Furnace/Layout Designer", false, 0)]
 		public static void ShowWindow()
 		{
-			_window = GetWindow<GridManagerWindow>("Grid Manager");
+			_window = GetWindow<LayoutDesignerWindow>("Layout Designer");
 			_window.minSize = new Vector2(300, 300);
 
 			var icon = EditorGUIUtility.IconContent("d_GridLayoutGroup Icon");
-			_window.titleContent = new GUIContent("Grid Manager", icon?.image);
+			_window.titleContent = new GUIContent("Layout Designer", icon?.image);
 			_window.Focus();
 		}
 
@@ -268,7 +268,7 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 			titleCol.Add(superTitle);
 
 			var nameRow = new VisualElement { style = { flexDirection = FlexDirection.Row, alignItems = Align.Center } };
-			nameRow.Add(new Label("Grid Manager")
+			nameRow.Add(new Label("Layout Designer")
 			{
 				style =
 				{
@@ -615,7 +615,7 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 
 
 			// Footer & Reset
-			settingsContainer.Add(new Label($"UI Furnace • Grid Guide (Lite) v{GridSettings.Version}")
+			settingsContainer.Add(new Label($"UI Furnace • Layout Designer v{GridSettings.Version}")
 			{
 				style =
 				{
@@ -1047,5 +1047,8 @@ namespace AZSoftStudio.UIFurnace.GridGuide
 			parent.Add(advBtn);
 		}
 	}
+
+	// Backwards compatibility alias for existing saved Unity window layouts
+	public class GridManagerWindow : LayoutDesignerWindow { }
 }
 #endif

@@ -10,26 +10,41 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: d7139f429b82ce341b02008883aef1bc, type: 3}
-  m_Name: vtg
-  m_EditorClassIdentifier: AZSoftStudio.UIFurnace.GridGuide.Runtime::AZSoftStudio.UIFurnace.GridGuide.GridProfile
+  m_Name: Canvas_GridProfile
+  m_EditorClassIdentifier: AZSoftStudio.UIFurnace.LayoutDesigner.Runtime::AZSoftStudio.UIFurnace.LayoutDesigner.GridProfile
   GridColor: {r: 0.3, g: 0.7, b: 1, a: 0.25}
   XAxisColor: {r: 1, g: 0.3, b: 0.3, a: 0.8}
   YAxisColor: {r: 0.3, g: 1, b: 0.3, a: 0.8}
   AxisThickness: 3
   GridThickness: 1
   GridOpacity: 1
-  CurrentMode: 0
+  CurrentMode: 1
   CurrentSymmetryMode: 1
   CurrentDynamicType: 1
   GridSpacingX: 50
   GridSpacingY: 50
-  GridColumns: 10
+  GridColumns: 13
   GridRows: 10
-  DynamicStretchX: []
-  DynamicStretchY: []
-  DynamicFixedX: []
-  DynamicFixedY: []
+  DynamicStretchX:
+  - 0.24902795
+  - 0.13383196
+  DynamicStretchY:
+  - 0.30717197
+  - 0.5446135
+  DynamicFixedX:
+  - 284.5
+  - 468.5802
+  - -275.9
+  - 502.6856
+  - 377.60843
+  - 275.9
+  DynamicFixedY:
+  - 141.49991
+  - 245.43372
+  - 0
+  - -96.4758
+  - 96.4758
   SnapToElements: 1
-  SnapElementsToGrid: 0
+  SnapElementsToGrid: 1
   SnapDistance: 3
-  ElementSnapDistance: 1
+  ElementSnapDistance: 3.35

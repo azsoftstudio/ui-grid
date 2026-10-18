@@ -1,4 +1,4 @@
-# UI Furnace - Grid Guide
+# UI Furnace: Layout Designer
 ## Visual Feedback & Roadmap Specification
 
 This document outlines the complete plan for **Visual Feedback enhancements** (Current Phase), along with the overarching **Product Roadmap** for upcoming phases.
