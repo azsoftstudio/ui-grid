@@ -20,30 +20,17 @@ MonoBehaviour:
   GridOpacity: 1
   CurrentMode: 1
   CurrentSymmetryMode: 1
-  CurrentDynamicType: 1
+  CurrentDynamicType: 0
   GridSpacingX: 50
   GridSpacingY: 50
   GridColumns: 13
   GridRows: 10
-  DynamicStretchX:
-  - 0.24902795
-  - 0.13383196
-  - 0.31800875
-  DynamicStretchY:
-  - 0.5996976
-  DynamicFixedX:
-  - 284.5
-  - 468.5802
-  - -275.9
-  - 502.6856
-  - 377.60843
-  - 275.9
+  DynamicStretchX: []
+  DynamicStretchY: []
+  DynamicFixedX: []
   DynamicFixedY:
-  - 141.49991
-  - 245.43372
-  - 0
-  - -96.4758
-  - 96.4758
+  - 151.15619
+  - 131.4758
   SnapToElements: 1
   SnapElementsToGrid: 1
   SnapDistance: 3

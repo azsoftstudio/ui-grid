@@ -39,15 +39,9 @@ namespace AZSoftStudio.UIFurnace.LayoutDesigner
 			if (SceneView.lastActiveSceneView != null) SceneView.lastActiveSceneView.Repaint();
 		}
 
-		// ─── Add Lines Mode (Drag from Axis) State ──────────────────────────────────────
-		/// <summary>When true, users can drag from the canvas edges to pull out a new horizontal/vertical guide.</summary>
-		public static bool IsAddLinesMode { get; set; } = false;
+		// ─── Axis Dragging State ────────────────────────────────────────────────────────
 		private static bool s_IsAxisDragging = false;     // True while mid-drag creating a new line
 		private static bool s_AxisDragIsVertical = false; // Which guide orientation is being pulled (true = vertical, false = horizontal)
-		private static bool s_HoverEdgeH = false;         // Mouse hovering near horizontal pull edges (Top or Bottom)
-		private static bool s_HoverEdgeV = false;         // Mouse hovering near vertical pull edges (Left or Right)
-		private static bool s_HoverEdgeTop = false;       // Specifically top edge
-		private static bool s_HoverEdgeLeft = false;      // Specifically left edge
 
 		// ─── Selection State (Transient) ────────────────────────────────────────────────
 		public static readonly List<int> SelectedIndicesX = new List<int>();
@@ -307,70 +301,6 @@ namespace AZSoftStudio.UIFurnace.LayoutDesigner
 				return; // Skip normal hover/drag logic while adding a line
 			} // end s_IsAddingLine
 
-			// ─── Add Lines Mode: Drag from Axis to Create New Line ──────────────────────────
-			if (IsAddLinesMode && !s_IsAxisDragging)
-			{
-				float distTop    = HandleUtility.DistanceToLine(TL, TR);
-				float distBottom = HandleUtility.DistanceToLine(BL, BR);
-				float distLeft   = HandleUtility.DistanceToLine(BL, TL);
-				float distRight  = HandleUtility.DistanceToLine(BR, TR);
-
-				float minDistH = Mathf.Min(distTop, distBottom);
-				float minDistV = Mathf.Min(distLeft, distRight);
-
-				float edgeThreshold = grabThreshold * 1.6f;
-
-				bool prevHoverH = s_HoverEdgeH;
-				bool prevHoverV = s_HoverEdgeV;
-
-				if (minDistH < edgeThreshold && minDistH <= minDistV)
-				{
-					s_HoverEdgeH = true;
-					s_HoverEdgeV = false;
-					s_HoverEdgeTop = distTop <= distBottom;
-				}
-				else if (minDistV < edgeThreshold && minDistV < minDistH)
-				{
-					s_HoverEdgeV = true;
-					s_HoverEdgeH = false;
-					s_HoverEdgeLeft = distLeft <= distRight;
-				}
-				else
-				{
-					s_HoverEdgeH = false;
-					s_HoverEdgeV = false;
-				}
-
-				if (prevHoverH != s_HoverEdgeH || prevHoverV != s_HoverEdgeV)
-				{
-					if (SceneView.currentDrawingSceneView != null) SceneView.currentDrawingSceneView.Repaint();
-				}
-
-				// CRITICAL FIX FOR CANVAS RESIZE: Register 0f distance during Layout so Unity RectTool
-				// never intercepts edge clicks or resizes the Canvas RectTransform
-				if (e.type == EventType.Layout)
-				{
-					if (s_HoverEdgeH || s_HoverEdgeV)
-					{
-						HandleUtility.AddControl(controlID, 0f);
-					}
-				}
-
-				if (e.type == EventType.Repaint)
-				{
-					DrawEdgePullTabs(BL, TL, TR, BR, localWidth, localHeight, right, up, controlID, mouseWorldPos);
-				}
-
-				if (e.type == EventType.MouseDown && e.button == 0 && (s_HoverEdgeH || s_HoverEdgeV))
-				{
-					s_IsAxisDragging = true;
-					s_AxisDragIsVertical = s_HoverEdgeV; // Dragging Left/Right border creates vertical guide; Top/Bottom creates horizontal guide
-					GUIUtility.hotControl = controlID;
-					PrepareSnapLines(center, right, up);
-					e.Use();
-				}
-			}
-
 			if (s_IsAxisDragging)
 			{
 				if (e.type == EventType.Layout)
@@ -387,13 +317,9 @@ namespace AZSoftStudio.UIFurnace.LayoutDesigner
 
 				if (e.type == EventType.Repaint)
 				{
-					Color baseColor = WithOpacity(GridSettings.GridColor);
-					float bh, bs, bv; Color.RGBToHSV(baseColor, out bh, out bs, out bv);
-					float dragHue = (bh + 0.25f) % 1f;
-					Color dragColor = Color.HSVToRGB(dragHue, Mathf.Max(0.5f, bs), Mathf.Max(0.6f, bv));
-					dragColor.a = baseColor.a;
+					Color dragColor = new Color(0.2f, 0.8f, 1f, 1f); // Crisp cyan matching selectedColor
 
-					EditorGUIUtility.AddCursorRect(new Rect(0, 0, 10000, 10000), s_AxisDragIsVertical ? MouseCursor.ResizeHorizontal : MouseCursor.ResizeVertical, controlID);
+					EditorGUIUtility.AddCursorRect(new Rect(0, 0, 10000, 10000), s_IsHoveringDeleteZone ? MouseCursor.ArrowMinus : (s_AxisDragIsVertical ? MouseCursor.ResizeHorizontal : MouseCursor.ResizeVertical), controlID);
 					Handles.color = dragColor;
 
 					if (s_SnapWorldLinesX.Count == 0 && s_SnapWorldLinesY.Count == 0)
@@ -417,7 +343,9 @@ namespace AZSoftStudio.UIFurnace.LayoutDesigner
 						float pxX = GridSettings.CurrentDynamicType == DynamicGridType.FixedPosition
 							? snappedProj / (localWidth > 0.001f ? canvasWidth / localWidth : 1f)
 							: (snappedProj / canvasWidth) * (s_CachedCanvasRect != null ? s_CachedCanvasRect.rect.width : localWidth);
-						DrawPositionBadge(mouseWorldPos, $"X: {(pxX >= 0 ? "+" : "")}{pxX:F0} px");
+						float displayPxX = GridSettings.ShowRulers ? ToDisplayCoord(pxX, localWidth * 0.5f, GridSettings.RulerOrigin, false) : pxX;
+						string signX = (GridSettings.ShowRulers && GridSettings.RulerOrigin != RulerCoordinateOrigin.CanvasCenter) ? "" : (displayPxX >= 0 ? "+" : "");
+						DrawPositionBadge(mouseWorldPos, $"X: {signX}{displayPxX:F0} px");
 					}
 					else
 					{
@@ -425,7 +353,7 @@ namespace AZSoftStudio.UIFurnace.LayoutDesigner
 						float snappedProj = ApplySnap(rawProj, s_SnapWorldLinesY, s_SnapSourcesY);
 						Vector3 lockedPos = center + up * snappedProj;
 						DrawCrispLine(GridSettings.GridThickness, lockedPos - right * halfWidth, lockedPos + right * halfWidth);
-						// #8 â€” Ghost mirror preview for axis drag
+						// #8 ── Ghost mirror preview for axis drag
 						if (GridSettings.IsMirrorModeActive)
 						{
 							Color ghost = dragColor; ghost.a *= 0.4f;
@@ -437,7 +365,9 @@ namespace AZSoftStudio.UIFurnace.LayoutDesigner
 						float pxY = GridSettings.CurrentDynamicType == DynamicGridType.FixedPosition
 							? snappedProj / (localHeight > 0.001f ? canvasHeight / localHeight : 1f)
 							: (snappedProj / canvasHeight) * (s_CachedCanvasRect != null ? s_CachedCanvasRect.rect.height : localHeight);
-						DrawPositionBadge(mouseWorldPos, $"Y: {(pxY >= 0 ? "+" : "")}{pxY:F0} px");
+						float displayPxY = GridSettings.ShowRulers ? ToDisplayCoord(pxY, localHeight * 0.5f, GridSettings.RulerOrigin, true) : pxY;
+						string signY = (GridSettings.ShowRulers && GridSettings.RulerOrigin != RulerCoordinateOrigin.CanvasCenter) ? "" : (displayPxY >= 0 ? "+" : "");
+						DrawPositionBadge(mouseWorldPos, $"Y: {signY}{displayPxY:F0} px");
 					}
 				}
 
@@ -449,6 +379,16 @@ namespace AZSoftStudio.UIFurnace.LayoutDesigner
 
 				if (e.type == EventType.MouseUp && e.button == 0)
 				{
+					if (s_IsHoveringDeleteZone)
+					{
+						s_IsAxisDragging = false;
+						s_IsHoveringDeleteZone = false;
+						GUIUtility.hotControl = 0;
+						if (SceneView.currentDrawingSceneView != null) SceneView.currentDrawingSceneView.Repaint();
+						e.Use();
+						return;
+					}
+
 					GridSettings.RecordUndo("Add Grid Line");
 
 					if (GridSettings.CurrentDynamicType == DynamicGridType.FixedPosition)
@@ -704,21 +644,67 @@ namespace AZSoftStudio.UIFurnace.LayoutDesigner
 
 					if (s_DragIndexX != -1)
 					{
-						EditorGUIUtility.AddCursorRect(cursorRect, MouseCursor.ResizeHorizontal, controlID);
-						// Side-effect: populates s_SnapHighlightedRects so snap brackets render this frame.
-						ApplySnap(Vector3.Dot(mouseWorldPos - center, right), s_SnapWorldLinesX, s_SnapSourcesX);
+						EditorGUIUtility.AddCursorRect(cursorRect, s_IsHoveringDeleteZone ? MouseCursor.ArrowMinus : MouseCursor.ResizeHorizontal, controlID);
+						float rawProj = Vector3.Dot(mouseWorldPos - center, right);
+						float snappedProj = ApplySnap(rawProj, s_SnapWorldLinesX, s_SnapSourcesX);
+						float pxX = GridSettings.CurrentDynamicType == DynamicGridType.FixedPosition
+							? snappedProj / scaleX
+							: ((snappedProj + halfWidth) / canvasWidth) * localWidth;
+						float displayVal = GridSettings.ShowRulers ? ToDisplayCoord(pxX, localWidth * 0.5f, GridSettings.RulerOrigin, false) : pxX;
+						string sign = (GridSettings.ShowRulers && GridSettings.RulerOrigin != RulerCoordinateOrigin.CanvasCenter) ? "" : (displayVal >= 0 ? "+" : "");
+						DrawPositionBadge(mouseWorldPos, $"X: {sign}{displayVal:F0} px");
 					}
 					if (s_DragIndexY != -1)
 					{
-						EditorGUIUtility.AddCursorRect(cursorRect, MouseCursor.ResizeVertical, controlID);
-						// Side-effect: populates s_SnapHighlightedRects so snap brackets render this frame.
-						ApplySnap(Vector3.Dot(mouseWorldPos - center, up), s_SnapWorldLinesY, s_SnapSourcesY);
+						EditorGUIUtility.AddCursorRect(cursorRect, s_IsHoveringDeleteZone ? MouseCursor.ArrowMinus : MouseCursor.ResizeVertical, controlID);
+						float rawProj = Vector3.Dot(mouseWorldPos - center, up);
+						float snappedProj = ApplySnap(rawProj, s_SnapWorldLinesY, s_SnapSourcesY);
+						float pxY = GridSettings.CurrentDynamicType == DynamicGridType.FixedPosition
+							? snappedProj / scaleY
+							: ((snappedProj + halfHeight) / canvasHeight) * localHeight;
+						float displayVal = GridSettings.ShowRulers ? ToDisplayCoord(pxY, localHeight * 0.5f, GridSettings.RulerOrigin, true) : pxY;
+						string sign = (GridSettings.ShowRulers && GridSettings.RulerOrigin != RulerCoordinateOrigin.CanvasCenter) ? "" : (displayVal >= 0 ? "+" : "");
+						DrawPositionBadge(mouseWorldPos, $"Y: {sign}{displayVal:F0} px");
 					}
 				}
 				else
 				{
-					if (s_HoverIndexX != -1) EditorGUIUtility.AddCursorRect(cursorRect, MouseCursor.ResizeHorizontal, controlID);
-					if (s_HoverIndexY != -1) EditorGUIUtility.AddCursorRect(cursorRect, MouseCursor.ResizeVertical, controlID);
+					if (s_HoverIndexX != -1)
+					{
+						EditorGUIUtility.AddCursorRect(cursorRect, MouseCursor.ResizeHorizontal, controlID);
+						float val = 0f;
+						if (GridSettings.CurrentDynamicType == DynamicGridType.FixedPosition)
+						{
+							if (s_HoverIndexX < GridSettings.DynamicFixedX.Count)
+								val = GridSettings.DynamicFixedX[s_HoverIndexX];
+						}
+						else
+						{
+							if (s_HoverIndexX < GridSettings.DynamicStretchX.Count)
+								val = (GridSettings.DynamicStretchX[s_HoverIndexX] - 0.5f) * localWidth;
+						}
+						float displayVal = GridSettings.ShowRulers ? ToDisplayCoord(val, localWidth * 0.5f, GridSettings.RulerOrigin, false) : val;
+						string sign = (GridSettings.ShowRulers && GridSettings.RulerOrigin != RulerCoordinateOrigin.CanvasCenter) ? "" : (displayVal >= 0 ? "+" : "");
+						DrawPositionBadge(mouseWorldPos, $"X: {sign}{displayVal:F0} px");
+					}
+					else if (s_HoverIndexY != -1)
+					{
+						EditorGUIUtility.AddCursorRect(cursorRect, MouseCursor.ResizeVertical, controlID);
+						float val = 0f;
+						if (GridSettings.CurrentDynamicType == DynamicGridType.FixedPosition)
+						{
+							if (s_HoverIndexY < GridSettings.DynamicFixedY.Count)
+								val = GridSettings.DynamicFixedY[s_HoverIndexY];
+						}
+						else
+						{
+							if (s_HoverIndexY < GridSettings.DynamicStretchY.Count)
+								val = (GridSettings.DynamicStretchY[s_HoverIndexY] - 0.5f) * localHeight;
+						}
+						float displayVal = GridSettings.ShowRulers ? ToDisplayCoord(val, localHeight * 0.5f, GridSettings.RulerOrigin, true) : val;
+						string sign = (GridSettings.ShowRulers && GridSettings.RulerOrigin != RulerCoordinateOrigin.CanvasCenter) ? "" : (displayVal >= 0 ? "+" : "");
+						DrawPositionBadge(mouseWorldPos, $"Y: {sign}{displayVal:F0} px");
+					}
 				}
 
 				// Snap highlight is drawn after DrawDynamicGrid in OnSceneGUI to ensure it's always on top.
@@ -818,6 +804,52 @@ namespace AZSoftStudio.UIFurnace.LayoutDesigner
 				}
 				else if (e.type == EventType.MouseUp && e.button == 0)
 				{
+					if (s_IsHoveringDeleteZone)
+					{
+						GridSettings.RecordUndo("Delete Guide Line");
+						if (s_DragIndexX >= 0)
+						{
+							if (GridSettings.CurrentDynamicType == DynamicGridType.FixedPosition)
+							{
+								if (s_DragIndexX < GridSettings.DynamicFixedX.Count)
+									GridSettings.DynamicFixedX.RemoveAt(s_DragIndexX);
+							}
+							else
+							{
+								if (s_DragIndexX < GridSettings.DynamicStretchX.Count)
+									GridSettings.DynamicStretchX.RemoveAt(s_DragIndexX);
+							}
+						}
+						else if (s_DragIndexY >= 0)
+						{
+							if (GridSettings.CurrentDynamicType == DynamicGridType.FixedPosition)
+							{
+								if (s_DragIndexY < GridSettings.DynamicFixedY.Count)
+									GridSettings.DynamicFixedY.RemoveAt(s_DragIndexY);
+							}
+							else
+							{
+								if (s_DragIndexY < GridSettings.DynamicStretchY.Count)
+									GridSettings.DynamicStretchY.RemoveAt(s_DragIndexY);
+							}
+						}
+
+						GridSettings.SaveDynamicLists();
+						s_IsDragging = false;
+						s_MirrorDragIndexX = -1;
+						s_MirrorDragIndexY = -1;
+						s_DragIndexX = -1;
+						s_DragIndexY = -1;
+						s_HoverIndexX = -1;
+						s_HoverIndexY = -1;
+						s_SnapHierarchyIsDirty = true;
+						s_IsHoveringDeleteZone = false;
+						GUIUtility.hotControl = 0;
+						if (SceneView.currentDrawingSceneView != null) SceneView.currentDrawingSceneView.Repaint();
+						e.Use();
+						return;
+					}
+
 					GridSettings.SaveDynamicLists();
 
 					// Clear the arrays cleanly on deselect

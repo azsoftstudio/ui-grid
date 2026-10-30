@@ -402,9 +402,30 @@ namespace AZSoftStudio.UIFurnace.LayoutDesigner
 				SceneView.RepaintAll();
 			});
 			masterLeft.Add(showGridToggle);
+
+			var rulerToggle = new Toggle("Rulers")
+			{
+				value = GridSettings.ShowRulers,
+				tooltip = "Toggle Canvas Edge Rulers (Shift+R)",
+				style =
+				{
+					fontSize = 11,
+					marginLeft = 14
+				}
+			};
+			rulerToggle.RegisterValueChangedCallback(evt =>
+			{
+				GridSettings.ShowRulers = evt.newValue;
+				SceneView.RepaintAll();
+			});
+			masterLeft.Add(rulerToggle);
+
 			masterCard.Add(masterLeft);
 
-			masterCard.Add(CreateKeycapBadge("Alt+G", "Toggle Grid Shortcut (Edit → Shortcuts)"));
+			var keycaps = new VisualElement { style = { flexDirection = FlexDirection.Row, alignItems = Align.Center } };
+			keycaps.Add(CreateKeycapBadge("Shift+R", "Toggle Rulers Shortcut"));
+			keycaps.Add(CreateKeycapBadge("Alt+G", "Toggle Grid Shortcut (Edit → Shortcuts)"));
+			masterCard.Add(keycaps);
 			root.Add(masterCard);
 
 			// =========================================================================
@@ -498,15 +519,35 @@ namespace AZSoftStudio.UIFurnace.LayoutDesigner
 				editRow.Add(editToggle);
 				editingGroup.Add(editRow);
 
-				var addLinesRow = new VisualElement { style = { flexDirection = FlexDirection.Row, justifyContent = Justify.SpaceBetween, marginBottom = 4 } };
-				var addLinesToggle = new Toggle("Pull Guides from Edges") { value = GridRenderer.IsAddLinesMode, tooltip = "Turn this on to click and drag new guides directly from the canvas borders into your layout in the Scene view (Photoshop / Illustrator style)!" };
-				addLinesToggle.RegisterValueChangedCallback(evt => { 
-					_isUpdatingInternally = true;
-					try { GridRenderer.IsAddLinesMode = evt.newValue; GridSettings.TriggerSettingsChanged(); }
-					finally { _isUpdatingInternally = false; }
+				var rulerRow = new VisualElement { style = { flexDirection = FlexDirection.Row, alignItems = Align.Center, justifyContent = Justify.SpaceBetween, marginBottom = 4 } };
+				var rulerToggleInEdit = new Toggle("Canvas Edge Rulers") { value = GridSettings.ShowRulers, tooltip = "Toggle pixel rulers along the top and left of the canvas (Shift+R). Pull guides directly from the ruler tracks!" };
+				rulerToggleInEdit.RegisterValueChangedCallback(evt => {
+					GridSettings.ShowRulers = evt.newValue;
+					SceneView.RepaintAll();
 				});
-				addLinesRow.Add(addLinesToggle);
-				subToolsGroup.Add(addLinesRow);
+				rulerRow.Add(rulerToggleInEdit);
+				rulerRow.Add(CreateKeycapBadge("Shift+R", "Toggle Rulers Shortcut"));
+				subToolsGroup.Add(rulerRow);
+
+				var originRow = new VisualElement { style = { flexDirection = FlexDirection.Row, alignItems = Align.Center, justifyContent = Justify.SpaceBetween, marginBottom = 6 } };
+				var originLabel = new Label("Ruler Origin") { style = { fontSize = 11, color = new Color(0.75f, 0.75f, 0.75f, 1f) } };
+				var originEnumField = new EnumField(GridSettings.RulerOrigin) { style = { width = 140 } };
+				originEnumField.RegisterValueChangedCallback(evt => {
+					GridSettings.RulerOrigin = (RulerCoordinateOrigin)evt.newValue;
+					SceneView.RepaintAll();
+				});
+				originRow.Add(originLabel);
+				originRow.Add(originEnumField);
+				subToolsGroup.Add(originRow);
+
+				var debugRow = new VisualElement { style = { flexDirection = FlexDirection.Row, alignItems = Align.Center, justifyContent = Justify.SpaceBetween, marginBottom = 6 } };
+				var debugToggle = new Toggle("Precision Debugger") { value = GridSettings.ShowRulerDebugOverlay, tooltip = "Show interactive precision HUD, laser alignment probes, and sub-pixel deviation metrics (Alt+D)" };
+				debugToggle.RegisterValueChangedCallback(evt => {
+					GridSettings.ShowRulerDebugOverlay = evt.newValue;
+					SceneView.RepaintAll();
+				});
+				debugRow.Add(debugToggle);
+				subToolsGroup.Add(debugRow);
 
 				var mirrorRow = new VisualElement { style = { flexDirection = FlexDirection.Row, justifyContent = Justify.SpaceBetween, marginBottom = 4 } };
 				var mirrorToggle = new Toggle("Mirror Mode") { value = GridSettings.IsMirrorModeActive, tooltip = "Turn this on to work symmetrically. When you pull a line to the right, a matching line will automatically appear on the left!" };

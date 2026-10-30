@@ -154,6 +154,19 @@ namespace AZSoftStudio.UIFurnace.LayoutDesigner
 						GridSettings.SaveSnapSettings(GridSettings.SnapToElements, newSnap, GridSettings.SnapDistance, GridSettings.ElementSnapDistance);
 				}
 
+				GUILayout.Space(2);
+
+				// Rulers Toggle
+				bool curRulers = GridSettings.ShowRulers;
+				if (curRulers) GUI.backgroundColor = ColorActiveToggle;
+				bool newRulers = GUILayout.Toggle(curRulers, new GUIContent("Rulers", "Toggle canvas edge rulers (Shift+R)"), s_ButtonNormalStyle, GUILayout.Height(20));
+				GUI.backgroundColor = defaultBg;
+				if (newRulers != curRulers)
+				{
+					GridSettings.ShowRulers = newRulers;
+					SceneView.RepaintAll();
+				}
+
 				// Contextual Edit Controls
 				if (isEditing)
 				{

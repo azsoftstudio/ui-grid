@@ -194,102 +194,6 @@ namespace AZSoftStudio.UIFurnace.LayoutDesigner
 			DrawCrispLine(axisThickness, midBot, midTop);
 		}
 
-		/// <summary>
-		/// Draws edge pull rails and interactive notch along canvas boundary for edge-pull guide creation.
-		/// </summary>
-		private static void DrawEdgePullTabs(Vector3 BL, Vector3 TL, Vector3 TR, Vector3 BR,
-			float localWidth, float localHeight, Vector3 right, Vector3 up, int controlID, Vector3 mouseWorldPos)
-		{
-			Color idleRailColor   = new Color(0.2f, 0.75f, 1f, 0.35f);
-			Color hoverRailColor  = new Color(0.35f, 0.95f, 1f, 1f);
-			Color draggingColor   = new Color(1f, 0.85f, 0.2f, 1f);
-
-			bool isHoverTop    = s_HoverEdgeH && s_HoverEdgeTop;
-			bool isHoverBottom = s_HoverEdgeH && !s_HoverEdgeTop;
-			bool isHoverLeft   = s_HoverEdgeV && s_HoverEdgeLeft;
-			bool isHoverRight  = s_HoverEdgeV && !s_HoverEdgeLeft;
-
-			Color topColor    = (s_IsAxisDragging && !s_AxisDragIsVertical) ? draggingColor : (isHoverTop ? hoverRailColor : idleRailColor);
-			Color bottomColor = (s_IsAxisDragging && !s_AxisDragIsVertical) ? draggingColor : (isHoverBottom ? hoverRailColor : idleRailColor);
-			Color leftColor   = (s_IsAxisDragging && s_AxisDragIsVertical) ? draggingColor : (isHoverLeft ? hoverRailColor : idleRailColor);
-			Color rightColor  = (s_IsAxisDragging && s_AxisDragIsVertical) ? draggingColor : (isHoverRight ? hoverRailColor : idleRailColor);
-
-			float topThick    = (isHoverTop || (s_IsAxisDragging && !s_AxisDragIsVertical)) ? 2.5f : 1.2f;
-			float bottomThick = (isHoverBottom || (s_IsAxisDragging && !s_AxisDragIsVertical)) ? 2.5f : 1.2f;
-			float leftThick   = (isHoverLeft || (s_IsAxisDragging && s_AxisDragIsVertical)) ? 2.5f : 1.2f;
-			float rightThick  = (isHoverRight || (s_IsAxisDragging && s_AxisDragIsVertical)) ? 2.5f : 1.2f;
-
-			// Draw crisp highlighted edge rails along canvas boundary
-			Handles.color = topColor;
-			DrawCrispLine(topThick, TL, TR);
-
-			Handles.color = bottomColor;
-			DrawCrispLine(bottomThick, BL, BR);
-
-			Handles.color = leftColor;
-			DrawCrispLine(leftThick, BL, TL);
-
-			Handles.color = rightColor;
-			DrawCrispLine(rightThick, BR, TR);
-
-			// Native Unity-style cursor feedback
-			if (isHoverTop || isHoverBottom)
-			{
-				EditorGUIUtility.AddCursorRect(new Rect(0, 0, 10000, 10000), MouseCursor.ResizeVertical, controlID);
-			}
-			else if (isHoverLeft || isHoverRight)
-			{
-				EditorGUIUtility.AddCursorRect(new Rect(0, 0, 10000, 10000), MouseCursor.ResizeHorizontal, controlID);
-			}
-
-			// Handle notch at mouse projection along hovered edge
-			if (isHoverTop || isHoverBottom || isHoverLeft || isHoverRight)
-			{
-				Vector3 edgePoint;
-				if (isHoverTop) edgePoint = HandleUtility.ProjectPointLine(mouseWorldPos, TL, TR);
-				else if (isHoverBottom) edgePoint = HandleUtility.ProjectPointLine(mouseWorldPos, BL, BR);
-				else if (isHoverLeft) edgePoint = HandleUtility.ProjectPointLine(mouseWorldPos, BL, TL);
-				else edgePoint = HandleUtility.ProjectPointLine(mouseWorldPos, BR, TR);
-
-				DrawEdgeHandleNotch(edgePoint, right, up, isHoverTop || isHoverBottom);
-				DrawPositionBadge(mouseWorldPos, (isHoverTop || isHoverBottom) ? "Pull Horizontal Guide" : "Pull Vertical Guide");
-			}
-		}
-
-		private static void DrawEdgeHandleNotch(Vector3 center, Vector3 right, Vector3 up, bool isHorizontal)
-		{
-			float handleSize = HandleUtility.GetHandleSize(center);
-			float halfAlong = handleSize * 0.08f;
-			float halfAcross = handleSize * 0.04f;
-
-			Color notchColor = new Color(0.35f, 0.95f, 1f, 1f);
-			Color notchShadow = new Color(0f, 0f, 0f, 0.7f);
-
-			Vector3 p1, p2, p3, p4;
-			if (isHorizontal)
-			{
-				p1 = center - right * halfAlong;
-				p2 = center + up * halfAcross;
-				p3 = center + right * halfAlong;
-				p4 = center - up * halfAcross;
-			}
-			else
-			{
-				p1 = center - up * halfAlong;
-				p2 = center + right * halfAcross;
-				p3 = center + up * halfAlong;
-				p4 = center - right * halfAcross;
-			}
-
-			// Shadow pass
-			Handles.color = notchShadow;
-			Handles.DrawAAConvexPolygon(p1, p2, p3, p4);
-
-			// Crisp border
-			Handles.color = notchColor;
-			Handles.DrawAAPolyLine(2f, p1, p2, p3, p4, p1);
-		}
-
 		/// <summary>Draw dynamically placed editable lines.</summary>
 		private static void DrawDynamicGrid(Vector3 BL, Vector3 TL, Vector3 TR, Vector3 BR, float localWidth, float localHeight)
 		{
@@ -381,15 +285,6 @@ namespace AZSoftStudio.UIFurnace.LayoutDesigner
 					Handles.color = gridColor;
 					DrawCrispLine(gridThickness, bot, top);
 				}
-
-				if (GridSettings.IsEditModeActive)
-				{
-					float handleSize = HandleUtility.GetHandleSize(bot) * 0.04f;
-					Color handleColor = isSnapped ? snapLineColor : (isDragged ? selectedColor : (isMirror ? mirrorColor : (isSelected ? selectedColor : (isHovered ? hoverColor : gridColor))));
-					Handles.color = handleColor;
-					Handles.DrawSolidDisc(bot, -Camera.current.transform.forward, handleSize);
-					Handles.DrawSolidDisc(top, -Camera.current.transform.forward, handleSize);
-				}
 			}
 
 			// Horizontal Lines
@@ -446,39 +341,9 @@ namespace AZSoftStudio.UIFurnace.LayoutDesigner
 					Handles.color = gridColor;
 					DrawCrispLine(gridThickness, left, rightPt);
 				}
-
-				if (GridSettings.IsEditModeActive)
-				{
-					float handleSize = HandleUtility.GetHandleSize(left) * 0.04f;
-					Color handleColor = isSnapped ? snapLineColor : (isDragged ? selectedColor : (isMirror ? mirrorColor : (isSelected ? selectedColor : (isHovered ? hoverColor : gridColor))));
-					Handles.color = handleColor;
-					Handles.DrawSolidDisc(left, -Camera.current.transform.forward, handleSize);
-					Handles.DrawSolidDisc(rightPt, -Camera.current.transform.forward, handleSize);
-				}
-			}
-
-			// Interactive guide placement cursor line preview
-			if (s_IsAddingLine)
-			{
-				Handles.color = new Color(0.2f, 0.8f, 1f, 0.8f);
-				Ray ray = HandleUtility.GUIPointToWorldRay(Event.current.mousePosition);
-				Plane plane = new Plane(-Camera.current.transform.forward, center);
-				if (plane.Raycast(ray, out float enter))
-				{
-					Vector3 hit = ray.GetPoint(enter);
-					if (s_AddingLineIsVertical)
-					{
-						Vector3 p = center + right * Vector3.Dot(hit - center, right);
-						DrawCrispLine(gridThickness + 1f, p - up * (canvasHeight * 0.5f), p + up * (canvasHeight * 0.5f));
-					}
-					else
-					{
-						Vector3 p = center + up * Vector3.Dot(hit - center, up);
-						DrawCrispLine(gridThickness + 1f, p - right * (canvasWidth * 0.5f), p + right * (canvasWidth * 0.5f));
-					}
-				}
 			}
 		}
 	}
 }
+
 #endif

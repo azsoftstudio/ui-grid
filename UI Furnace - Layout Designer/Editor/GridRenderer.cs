@@ -28,6 +28,7 @@ namespace AZSoftStudio.UIFurnace.LayoutDesigner
 		/// Used by LayoutDesignerWindow to show a contextual warning.
 		/// </summary>
 		public static bool IsWorldSpaceCanvas { get; private set; }
+		public static RectTransform ActiveCanvasRectTransform => s_CachedCanvasRect;
 
 		static GridRenderer()
 		{
@@ -63,10 +64,6 @@ namespace AZSoftStudio.UIFurnace.LayoutDesigner
 			s_MirrorDragIndexY = -1;
 			s_HoverIndexX = -1;
 			s_HoverIndexY = -1;
-			s_HoverEdgeH = false;
-			s_HoverEdgeV = false;
-			s_HoverEdgeTop = false;
-			s_HoverEdgeLeft = false;
 			s_CurrentDragMode = DragMode.None;
 			s_HUDInitialized = false;
 			s_SpecHUDInitialized = false;
@@ -77,6 +74,7 @@ namespace AZSoftStudio.UIFurnace.LayoutDesigner
 			s_ElementSnapHighlightedRects.Clear();
 			s_HighlightOffsetsX.Clear();
 			s_HighlightOffsetsY.Clear();
+			ResetRulerInteractionState();
 			InvalidateCache();
 		}
 
@@ -320,6 +318,20 @@ namespace AZSoftStudio.UIFurnace.LayoutDesigner
 				// Draw position badge on top of all grid lines, axes, and snap highlights
 				DrawPendingPositionBadge();
 
+				// ─── Canvas Edge Rulers (Revision 3: Viewport-Adaptive & Designer-Grade) ────
+				if (GridSettings.ShowRulers)
+				{
+					int rulerCtrlID = GUIUtility.GetControlID("UIFurnaceRuler".GetHashCode(), FocusType.Passive);
+					HandleRulerEvents(Event.current, rulerCtrlID, canvasRect, BL, TL, TR, BR, localWidth, localHeight);
+					DrawCanvasRulers(BL, TL, TR, BR, localWidth, localHeight, rulerCtrlID);
+				}
+
+				// ─── Ruler Precision Diagnostics & Verification Overlay ────────────
+				if (GridSettings.ShowRulerDebugOverlay)
+				{
+					RulerPrecisionDebugger.DrawPrecisionOverlay(canvasRect, BL, TL, TR, BR, localWidth, localHeight);
+				}
+
 #if !UNITY_2021_2_OR_NEWER
 				// Fallback floating Canvas Spec HUD for Unity 2020 and earlier (Unity 2021.2+ uses native UIFurnaceOverlay)
 				DrawMovableSpecHUD(localWidth, localHeight);
@@ -349,6 +361,14 @@ namespace AZSoftStudio.UIFurnace.LayoutDesigner
 		public static void ToggleSnapElementsToGrid()
 		{
 			GridSettings.SaveSnapSettings(GridSettings.SnapToElements, !GridSettings.SnapElementsToGrid, GridSettings.SnapDistance, GridSettings.ElementSnapDistance);
+			SceneView.RepaintAll();
+			RefreshOpenWindows();
+		}
+
+		[MenuItem("Tools/UI Furnace/Toggle Rulers #r", false, 3)]
+		public static void ToggleRulers()
+		{
+			GridSettings.ShowRulers = !GridSettings.ShowRulers;
 			SceneView.RepaintAll();
 			RefreshOpenWindows();
 		}
@@ -518,12 +538,7 @@ namespace AZSoftStudio.UIFurnace.LayoutDesigner
 			GridSettings.IsEditModeActive   = false;
 			GridSettings.IsMirrorModeActive = false; // #8 reset mirror on exit
 			s_IsAddingLine   = false;
-			IsAddLinesMode   = false;
 			s_IsAxisDragging = false;
-			s_HoverEdgeH = false;
-			s_HoverEdgeV = false;
-			s_HoverEdgeTop = false;
-			s_HoverEdgeLeft = false;
 			GUIUtility.hotControl = 0;
 			SelectedIndicesX.Clear();
 			SelectedIndicesY.Clear();

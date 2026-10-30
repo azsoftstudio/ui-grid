@@ -50,6 +50,25 @@ namespace AZSoftStudio.UIFurnace.LayoutDesigner
 			set => EditorPrefs.SetBool("UIFurnace_ShowCanvasSpecHUD", value);
 		}
 
+		// ─── Canvas Edge Ruler Settings (Editor-wide) ─────────────────────────
+		public static bool ShowRulers
+		{
+			get => EditorPrefs.GetBool("UIFurnace_ShowRulers", true);
+			set => EditorPrefs.SetBool("UIFurnace_ShowRulers", value);
+		}
+
+		public static RulerCoordinateOrigin RulerOrigin
+		{
+			get => (RulerCoordinateOrigin)EditorPrefs.GetInt("UIFurnace_RulerOrigin", 0);
+			set => EditorPrefs.SetInt("UIFurnace_RulerOrigin", (int)value);
+		}
+
+		public static bool ShowRulerDebugOverlay
+		{
+			get => EditorPrefs.GetBool("UIFurnace_ShowRulerDebugOverlay", false);
+			set => EditorPrefs.SetBool("UIFurnace_ShowRulerDebugOverlay", value);
+		}
+
 		// ─── Snapping State ────────────────────────────────────────────────────
 		public static bool  SnapToElements { get; set; } = true;
 		public static bool  SnapElementsToGrid { get; set; } = false;
@@ -374,7 +393,6 @@ namespace AZSoftStudio.UIFurnace.LayoutDesigner
 			{
 				IsEditModeActive = false;
 				IsMirrorModeActive = false;
-				GridRenderer.IsAddLinesMode = false;
 			}
 
 			if (ActiveProfile != null)
@@ -822,6 +840,16 @@ namespace AZSoftStudio.UIFurnace.LayoutDesigner
 				case "YAxisColor": a.YAxisColor = color; break;
 			}
 		}
+	}
+
+	/// <summary>
+	/// Coordinate system origin mode for Canvas Edge Rulers.
+	/// </summary>
+	public enum RulerCoordinateOrigin
+	{
+		CanvasCenter = 0, // (0,0) at center of Canvas (matches RectTransform center pivot math)
+		TopLeft      = 1, // (0,0) at Top-Left, Y increases downward (Figma / Web standard)
+		BottomLeft   = 2  // (0,0) at Bottom-Left, Y increases upward (native uGUI anchorMin=(0,0) standard)
 	}
 }
 #endif
