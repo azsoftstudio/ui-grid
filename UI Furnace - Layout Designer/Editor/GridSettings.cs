@@ -69,6 +69,18 @@ namespace AZSoftStudio.UIFurnace.LayoutDesigner
 			set => EditorPrefs.SetBool("UIFurnace_ShowRulerDebugOverlay", value);
 		}
 
+		public static bool ShowRulerAnchorPips
+		{
+			get => EditorPrefs.GetBool("UIFurnace_ShowRulerAnchorPips", false);
+			set => EditorPrefs.SetBool("UIFurnace_ShowRulerAnchorPips", value);
+		}
+
+		public static bool RulersCollapsed
+		{
+			get => EditorPrefs.GetBool("UIFurnace_RulersCollapsed", false);
+			set => EditorPrefs.SetBool("UIFurnace_RulersCollapsed", value);
+		}
+
 		// ─── Snapping State ────────────────────────────────────────────────────
 		public static bool  SnapToElements { get; set; } = true;
 		public static bool  SnapElementsToGrid { get; set; } = false;
@@ -603,6 +615,7 @@ namespace AZSoftStudio.UIFurnace.LayoutDesigner
 				case "MainSettings": MainSettingsCollapsed = collapsed; a.LayoutCollapsed = collapsed; break;
 				case "Interaction":  InteractionCollapsed  = collapsed; a.SnappingCollapsed = collapsed; break;
 				case "Editing":      EditingCollapsed      = collapsed; a.EditingCollapsed  = collapsed; break;
+				case "Rulers":       RulersCollapsed       = collapsed; break;
 				case "Visuals":      VisualsCollapsed      = collapsed; a.ColorsCollapsed   = collapsed; break;
 			}
 			a.SaveToDisk();

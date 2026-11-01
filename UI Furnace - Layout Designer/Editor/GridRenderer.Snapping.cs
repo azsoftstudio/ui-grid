@@ -80,7 +80,17 @@ namespace AZSoftStudio.UIFurnace.LayoutDesigner
 			if (s_IsDragging || s_IsAxisDragging || s_IsAddingLine) return;
 			if (GUIUtility.hotControl == 0)
 			{
-				s_CurrentDragMode = DragMode.None;
+				if (s_CurrentDragMode != DragMode.None)
+				{
+					s_CurrentDragMode = DragMode.None;
+					s_ElementSnapHighlightedRects.Clear();
+					s_HighlightOffsetsX.Clear();
+					s_HighlightOffsetsY.Clear();
+					if (SceneView.currentDrawingSceneView != null)
+						SceneView.currentDrawingSceneView.Repaint();
+					else if (SceneView.lastActiveSceneView != null)
+						SceneView.lastActiveSceneView.Repaint();
+				}
 			}
 			if (!GridSettings.SnapElementsToGrid) return;
 			if (GridSettings.ActiveProfile == null) return;
@@ -413,14 +423,51 @@ namespace AZSoftStudio.UIFurnace.LayoutDesigner
 				if (go != null) s_SelectionBuffer.Add(go);
 			}
 
+			// Add Root Canvas Edges & Center as primary snapping targets
+			if (s_CachedCanvasRect != null)
+			{
+				s_CachedCanvasRect.GetWorldCorners(s_CornersCache);
+				float cMinX = float.MaxValue, cMaxX = float.MinValue;
+				float cMinY = float.MaxValue, cMaxY = float.MinValue;
+
+				for (int c = 0; c < 4; c++)
+				{
+					float projX = Vector3.Dot(s_CornersCache[c] - center, right);
+					float projY = Vector3.Dot(s_CornersCache[c] - center, up);
+
+					if (projX < cMinX) cMinX = projX;
+					if (projX > cMaxX) cMaxX = projX;
+					if (projY < cMinY) cMinY = projY;
+					if (projY > cMaxY) cMaxY = projY;
+				}
+
+				// Left edge, Center axis, Right edge
+				s_SnapWorldLinesX.Add(cMinX); s_SnapSourcesX.Add(s_CachedCanvasRect);
+				s_SnapWorldLinesX.Add((cMinX + cMaxX) * 0.5f); s_SnapSourcesX.Add(s_CachedCanvasRect);
+				s_SnapWorldLinesX.Add(cMaxX); s_SnapSourcesX.Add(s_CachedCanvasRect);
+
+				// Bottom edge, Center axis, Top edge
+				s_SnapWorldLinesY.Add(cMinY); s_SnapSourcesY.Add(s_CachedCanvasRect);
+				s_SnapWorldLinesY.Add((cMinY + cMaxY) * 0.5f); s_SnapSourcesY.Add(s_CachedCanvasRect);
+				s_SnapWorldLinesY.Add(cMaxY); s_SnapSourcesY.Add(s_CachedCanvasRect);
+			}
+
 			for (int i = 0; i < s_CachedSnapHierarchy.Length; i++)
 			{
 				RectTransform rt = s_CachedSnapHierarchy[i];
 				if (rt == null || rt == s_CachedCanvasRect) continue;
-				if (s_SelectionBuffer.Contains(rt.gameObject)) continue;
 
+				// Always stamp the cache BEFORE the selection skip.
+				// If we skip first and stamp second, the selected element's old matrix
+				// remains cached. Next frame the dirty-check fires again (matrix changed!)
+				// and if s_SelectionBuffer is momentarily empty the selected element's
+				// own edges get registered as snap targets - causing it to snap to itself.
 				s_CachedSnapMatrices[i] = rt.localToWorldMatrix;
 				s_CachedSnapRects[i] = rt.rect;
+
+				// Exclude selected elements ONLY when actively dragging/resizing a UI element with Unity's Rect Tool
+				// (to avoid snapping an element to itself). When dragging/adding grid lines or guides, ALWAYS include selected elements!
+				if (s_CurrentDragMode != DragMode.None && s_SelectionBuffer.Contains(rt.gameObject)) continue;
 
 				rt.GetWorldCorners(s_CornersCache);
 
@@ -457,6 +504,9 @@ namespace AZSoftStudio.UIFurnace.LayoutDesigner
 
 		private static float ApplySnap(float rawProj, List<float> snapLines, List<RectTransform> snapSources, float snapThreshold)
 		{
+			// If user is hovering over the ruler delete zone, suppress snap so it does not fight deletion
+			if (s_IsHoveringDeleteZone) return rawProj;
+
 			if (snapLines == null || snapLines.Count == 0) return rawProj;
 
 			float bestLine = rawProj;
@@ -476,7 +526,7 @@ namespace AZSoftStudio.UIFurnace.LayoutDesigner
 				}
 			}
 
-			if (matchedRT != null && !s_SnapHighlightedRects.Contains(matchedRT))
+			if (matchedRT != null && matchedRT != s_CachedCanvasRect && !s_SnapHighlightedRects.Contains(matchedRT))
 			{
 				s_SnapHighlightedRects.Add(matchedRT);
 			}
@@ -554,8 +604,8 @@ namespace AZSoftStudio.UIFurnace.LayoutDesigner
 				}
 			}
 
-			// Snapping visual cues when dragging UI elements
-			if (GridSettings.SnapElementsToGrid && Tools.current == Tool.Rect)
+			// Snapping visual cues ONLY when actively dragging or resizing UI elements (never when just selected)
+			if (GridSettings.SnapElementsToGrid && Tools.current == Tool.Rect && s_CurrentDragMode != DragMode.None)
 			{
 				float snapDist = GridSettings.ElementSnapDistance;
 
@@ -582,22 +632,28 @@ namespace AZSoftStudio.UIFurnace.LayoutDesigner
 								{
 									isSnapped = true;
 									float snappedLineX = s_ActiveWorldGridLinesX[i];
-									Vector3 bot = center + right * snappedLineX - up * halfH;
-									Vector3 top = center + right * snappedLineX + up * halfH;
-									Handles.color = GetGridComplementColor();
-									DrawCrispLine(Mathf.Max(GridSettings.GridThickness + 1.5f, 2.5f), bot, top);
+									bool isAxisX = Mathf.Abs(snappedLineX) < 0.001f;
 
-									if (GridSettings.CurrentMode == GridMode.CustomLines)
+									// Do not draw snap highlight line over central axis
+									if (!isAxisX)
 									{
-										bool isFixed = GridSettings.CurrentDynamicType == DynamicGridType.FixedPosition;
-										var linesX = isFixed ? GridSettings.DynamicFixedX : GridSettings.DynamicStretchX;
-										for (int lx = 0; lx < linesX.Count; lx++)
+										Vector3 bot = center + right * snappedLineX - up * halfH;
+										Vector3 top = center + right * snappedLineX + up * halfH;
+										Handles.color = GetGridComplementColor();
+										DrawCrispLine(Mathf.Max(GridSettings.GridThickness + 1.5f, 2.5f), bot, top);
+
+										if (GridSettings.CurrentMode == GridMode.CustomLines)
 										{
-											float originalOffset = linesX[lx];
-											float wOff = isFixed ? (originalOffset * scaleX) : ((originalOffset - 0.5f) * canvasWidth);
-											if (Mathf.Abs(wOff - snappedLineX) < 0.001f)
+											bool isFixed = GridSettings.CurrentDynamicType == DynamicGridType.FixedPosition;
+											var linesX = isFixed ? GridSettings.DynamicFixedX : GridSettings.DynamicStretchX;
+											for (int lx = 0; lx < linesX.Count; lx++)
 											{
-												s_HighlightOffsetsX.Add(originalOffset);
+												float originalOffset = linesX[lx];
+												float wOff = isFixed ? (originalOffset * scaleX) : ((originalOffset - 0.5f) * canvasWidth);
+												if (Mathf.Abs(wOff - snappedLineX) < 0.001f)
+												{
+													s_HighlightOffsetsX.Add(originalOffset);
+												}
 											}
 										}
 									}
@@ -615,22 +671,28 @@ namespace AZSoftStudio.UIFurnace.LayoutDesigner
 								{
 									isSnapped = true;
 									float snappedLineY = s_ActiveWorldGridLinesY[i];
-									Vector3 leftPt = center + up * snappedLineY - right * halfW;
-									Vector3 rightPt = center + up * snappedLineY + right * halfW;
-									Handles.color = GetGridComplementColor();
-									DrawCrispLine(Mathf.Max(GridSettings.GridThickness + 1.5f, 2.5f), leftPt, rightPt);
+									bool isAxisY = Mathf.Abs(snappedLineY) < 0.001f;
 
-									if (GridSettings.CurrentMode == GridMode.CustomLines)
+									// Do not draw snap highlight line over central axis
+									if (!isAxisY)
 									{
-										bool isFixed = GridSettings.CurrentDynamicType == DynamicGridType.FixedPosition;
-										var linesY = isFixed ? GridSettings.DynamicFixedY : GridSettings.DynamicStretchY;
-										for (int ly = 0; ly < linesY.Count; ly++)
+										Vector3 leftPt = center + up * snappedLineY - right * halfW;
+										Vector3 rightPt = center + up * snappedLineY + right * halfW;
+										Handles.color = GetGridComplementColor();
+										DrawCrispLine(Mathf.Max(GridSettings.GridThickness + 1.5f, 2.5f), leftPt, rightPt);
+
+										if (GridSettings.CurrentMode == GridMode.CustomLines)
 										{
-											float originalOffset = linesY[ly];
-											float wOff = isFixed ? (originalOffset * scaleY) : ((originalOffset - 0.5f) * canvasHeight);
-											if (Mathf.Abs(wOff - snappedLineY) < 0.001f)
+											bool isFixed = GridSettings.CurrentDynamicType == DynamicGridType.FixedPosition;
+											var linesY = isFixed ? GridSettings.DynamicFixedY : GridSettings.DynamicStretchY;
+											for (int ly = 0; ly < linesY.Count; ly++)
 											{
-												s_HighlightOffsetsY.Add(originalOffset);
+												float originalOffset = linesY[ly];
+												float wOff = isFixed ? (originalOffset * scaleY) : ((originalOffset - 0.5f) * canvasHeight);
+												if (Mathf.Abs(wOff - snappedLineY) < 0.001f)
+												{
+													s_HighlightOffsetsY.Add(originalOffset);
+												}
 											}
 										}
 									}

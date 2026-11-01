@@ -260,8 +260,11 @@ namespace AZSoftStudio.UIFurnace.LayoutDesigner
 			// 5. Draw Vertical Ticks & Labels on Left Ruler
 			DrawVerticalTicks(halfH, Spx_Y, minorStepY, majorStepY, origin, ppp);
 
-			// 6. Project Selected Element Anchors (Subtle Inner Edge Notch Pips)
-			DrawSelectedAnchorNotches(halfW, halfH, localWidth, localHeight, ppp);
+			// 6. Project Selected Element Anchors (Subtle Inner Edge Notch Pips - Off by default)
+			if (GridSettings.ShowRulerAnchorPips)
+			{
+				DrawSelectedAnchorNotches(halfW, halfH, localWidth, localHeight, ppp);
+			}
 
 			// 7. Draw Cursor Tracking Hairlines
 			DrawCursorTrackingHairlines(ppp);

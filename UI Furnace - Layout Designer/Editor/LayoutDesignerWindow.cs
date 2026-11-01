@@ -402,28 +402,9 @@ namespace AZSoftStudio.UIFurnace.LayoutDesigner
 				SceneView.RepaintAll();
 			});
 			masterLeft.Add(showGridToggle);
-
-			var rulerToggle = new Toggle("Rulers")
-			{
-				value = GridSettings.ShowRulers,
-				tooltip = "Toggle Canvas Edge Rulers (Shift+R)",
-				style =
-				{
-					fontSize = 11,
-					marginLeft = 14
-				}
-			};
-			rulerToggle.RegisterValueChangedCallback(evt =>
-			{
-				GridSettings.ShowRulers = evt.newValue;
-				SceneView.RepaintAll();
-			});
-			masterLeft.Add(rulerToggle);
-
 			masterCard.Add(masterLeft);
 
 			var keycaps = new VisualElement { style = { flexDirection = FlexDirection.Row, alignItems = Align.Center } };
-			keycaps.Add(CreateKeycapBadge("Shift+R", "Toggle Rulers Shortcut"));
 			keycaps.Add(CreateKeycapBadge("Alt+G", "Toggle Grid Shortcut (Edit → Shortcuts)"));
 			masterCard.Add(keycaps);
 			root.Add(masterCard);
@@ -519,36 +500,6 @@ namespace AZSoftStudio.UIFurnace.LayoutDesigner
 				editRow.Add(editToggle);
 				editingGroup.Add(editRow);
 
-				var rulerRow = new VisualElement { style = { flexDirection = FlexDirection.Row, alignItems = Align.Center, justifyContent = Justify.SpaceBetween, marginBottom = 4 } };
-				var rulerToggleInEdit = new Toggle("Canvas Edge Rulers") { value = GridSettings.ShowRulers, tooltip = "Toggle pixel rulers along the top and left of the canvas (Shift+R). Pull guides directly from the ruler tracks!" };
-				rulerToggleInEdit.RegisterValueChangedCallback(evt => {
-					GridSettings.ShowRulers = evt.newValue;
-					SceneView.RepaintAll();
-				});
-				rulerRow.Add(rulerToggleInEdit);
-				rulerRow.Add(CreateKeycapBadge("Shift+R", "Toggle Rulers Shortcut"));
-				subToolsGroup.Add(rulerRow);
-
-				var originRow = new VisualElement { style = { flexDirection = FlexDirection.Row, alignItems = Align.Center, justifyContent = Justify.SpaceBetween, marginBottom = 6 } };
-				var originLabel = new Label("Ruler Origin") { style = { fontSize = 11, color = new Color(0.75f, 0.75f, 0.75f, 1f) } };
-				var originEnumField = new EnumField(GridSettings.RulerOrigin) { style = { width = 140 } };
-				originEnumField.RegisterValueChangedCallback(evt => {
-					GridSettings.RulerOrigin = (RulerCoordinateOrigin)evt.newValue;
-					SceneView.RepaintAll();
-				});
-				originRow.Add(originLabel);
-				originRow.Add(originEnumField);
-				subToolsGroup.Add(originRow);
-
-				var debugRow = new VisualElement { style = { flexDirection = FlexDirection.Row, alignItems = Align.Center, justifyContent = Justify.SpaceBetween, marginBottom = 6 } };
-				var debugToggle = new Toggle("Precision Debugger") { value = GridSettings.ShowRulerDebugOverlay, tooltip = "Show interactive precision HUD, laser alignment probes, and sub-pixel deviation metrics (Alt+D)" };
-				debugToggle.RegisterValueChangedCallback(evt => {
-					GridSettings.ShowRulerDebugOverlay = evt.newValue;
-					SceneView.RepaintAll();
-				});
-				debugRow.Add(debugToggle);
-				subToolsGroup.Add(debugRow);
-
 				var mirrorRow = new VisualElement { style = { flexDirection = FlexDirection.Row, justifyContent = Justify.SpaceBetween, marginBottom = 4 } };
 				var mirrorToggle = new Toggle("Mirror Mode") { value = GridSettings.IsMirrorModeActive, tooltip = "Turn this on to work symmetrically. When you pull a line to the right, a matching line will automatically appear on the left!" };
 				mirrorToggle.RegisterValueChangedCallback(evt => { 
@@ -620,7 +571,52 @@ namespace AZSoftStudio.UIFurnace.LayoutDesigner
 			interactionFoldout.Add(interactionGroup);
 
 			// =========================================================================
-			// 6. VISUALS & APPEARANCE (The Look)
+			// 6. CANVAS RULERS (Minimal & Convenient)
+			// =========================================================================
+			var rulerFoldout = new Foldout { text = "Canvas Rulers", value = !GridSettings.RulersCollapsed, style = { marginTop = 8, unityFontStyleAndWeight = FontStyle.Bold } };
+			rulerFoldout.RegisterValueChangedCallback(evt => GridSettings.SaveCollapseState("Rulers", !evt.newValue));
+			settingsContainer.Add(rulerFoldout);
+
+			var rulerGroup = new VisualElement { style = { marginLeft = 15 } };
+
+			var rulerToggleRow = new VisualElement { style = { flexDirection = FlexDirection.Row, alignItems = Align.Center, justifyContent = Justify.SpaceBetween, marginBottom = 6 } };
+			var rulerToggle = new Toggle("Enable Edge Rulers")
+			{
+				value = GridSettings.ShowRulers,
+				tooltip = "Displays pixel rulers along the canvas edges. Drag from either ruler into the scene to create new guide lines."
+			};
+			rulerToggle.RegisterValueChangedCallback(evt =>
+			{
+				GridSettings.ShowRulers = evt.newValue;
+				SceneView.RepaintAll();
+			});
+			rulerToggleRow.Add(rulerToggle);
+			rulerToggleRow.Add(CreateKeycapBadge("Shift+R", "Toggle Rulers Shortcut"));
+			rulerGroup.Add(rulerToggleRow);
+
+			var pipsToggleRow = new VisualElement { style = { flexDirection = FlexDirection.Row, alignItems = Align.Center, justifyContent = Justify.SpaceBetween, marginBottom = 4 } };
+			var pipsToggle = new Toggle("Ruler Anchor Notches")
+			{
+				value = GridSettings.ShowRulerAnchorPips,
+				tooltip = "Shows small colored squares on the ruler edge: amber = anchor corners, purple = pivot. They mark exactly where the selected element's anchors and pivot land on the ruler, so you can read off their positions at a glance. Off by default because they can look like rendering artifacts when the element is at canvas center."
+			};
+			pipsToggle.RegisterValueChangedCallback(evt =>
+			{
+				GridSettings.ShowRulerAnchorPips = evt.newValue;
+				SceneView.RepaintAll();
+			});
+			pipsToggleRow.Add(pipsToggle);
+			rulerGroup.Add(pipsToggleRow);
+
+			rulerGroup.Add(new Label("Tip: Click the top-left corner box on the scene ruler to cycle origin (Center, Top-Left, Bottom-Left).")
+			{
+				style = { fontSize = 10, opacity = 0.6f, unityFontStyleAndWeight = FontStyle.Italic, whiteSpace = WhiteSpace.Normal, marginTop = 2, marginBottom = 4 }
+			});
+
+			rulerFoldout.Add(rulerGroup);
+
+			// =========================================================================
+			// 7. VISUALS & APPEARANCE (The Look)
 			// =========================================================================
 			var visualsFoldout = new Foldout { text = "Visuals & Appearance", value = !GridSettings.VisualsCollapsed, style = { marginTop = 8, unityFontStyleAndWeight = FontStyle.Bold } };
 			visualsFoldout.RegisterValueChangedCallback(evt => GridSettings.SaveCollapseState("Visuals", !evt.newValue));

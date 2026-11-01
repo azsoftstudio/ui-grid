@@ -218,10 +218,10 @@ namespace AZSoftStudio.UIFurnace.LayoutDesigner
 			Handles.color = yAxisColor;
 			DrawCrispLine(axisThickness, center - up * canvasHeight * 0.5f, center + up * canvasHeight * 0.5f);
 
-			// Highlight colors
-			Color selectedColor = new Color(0.2f, 0.8f, 1f, 1f);
-			Color hoverColor    = new Color(1f, 1f, 0.2f, 0.9f);
-			Color mirrorColor   = new Color(1f, 0.55f, 0.1f, 0.95f);
+			// Highlight colors (Dynamically adapted to guarantee perceptual contrast against GridColor)
+			Color selectedColor = GetAdaptiveSelectedColor();
+			Color hoverColor    = GetAdaptiveHoverColor();
+			Color mirrorColor   = GetAdaptiveMirrorColor();
 			Color snapLineColor = GetGridComplementColor();
 
 			bool isFixed = GridSettings.CurrentDynamicType == DynamicGridType.FixedPosition;
@@ -342,6 +342,58 @@ namespace AZSoftStudio.UIFurnace.LayoutDesigner
 					DrawCrispLine(gridThickness, left, rightPt);
 				}
 			}
+		}
+
+		/// <summary>
+		/// Returns an adaptive high-visibility selection color that guarantees high contrast
+		/// against the current GridColor and background.
+		/// </summary>
+		public static Color GetAdaptiveSelectedColor()
+		{
+			Color.RGBToHSV(GridSettings.GridColor, out float h, out float s, out float v);
+			// If grid is cyan/blue (h 0.44-0.66), shift selection to electric magenta (h 0.85) to avoid hue collision
+			float selectHue = (h >= 0.44f && h <= 0.66f) ? 0.85f : 0.54f;
+			Color c = Color.HSVToRGB(selectHue, 0.88f, 1f);
+			c.a = 1f;
+			return c;
+		}
+
+		/// <summary>
+		/// Returns an adaptive hover color that contrasts sharply with GridColor.
+		/// </summary>
+		public static Color GetAdaptiveHoverColor()
+		{
+			Color.RGBToHSV(GridSettings.GridColor, out float h, out float s, out float v);
+			// If grid is yellow/gold (h 0.08-0.24), shift hover to electric cyan (h 0.52)
+			float hoverHue = (h >= 0.08f && h <= 0.24f) ? 0.52f : 0.15f;
+			Color c = Color.HSVToRGB(hoverHue, 0.88f, 1f);
+			c.a = 0.95f;
+			return c;
+		}
+
+		/// <summary>
+		/// Returns an adaptive interactive preview color for Add Line and Ruler Pull drags,
+		/// with guaranteed full opacity (never faded by subtle grid alpha).
+		/// </summary>
+		public static Color GetAdaptivePreviewColor()
+		{
+			Color.RGBToHSV(GridSettings.GridColor, out float h, out float s, out float v);
+			float previewHue = (h >= 0.44f && h <= 0.66f) ? 0.83f : 0.54f;
+			Color c = Color.HSVToRGB(previewHue, 0.82f, 1f);
+			c.a = 0.95f;
+			return c;
+		}
+
+		/// <summary>
+		/// Returns an adaptive mirror preview color that contrasts with both the grid and main preview.
+		/// </summary>
+		public static Color GetAdaptiveMirrorColor()
+		{
+			Color.RGBToHSV(GridSettings.GridColor, out float h, out float s, out float v);
+			float mirrorHue = (h >= 0.03f && h <= 0.14f) ? 0.75f : 0.08f;
+			Color c = Color.HSVToRGB(mirrorHue, 0.85f, 1f);
+			c.a = 0.90f;
+			return c;
 		}
 	}
 }

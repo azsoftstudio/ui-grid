@@ -156,9 +156,9 @@ namespace AZSoftStudio.UIFurnace.LayoutDesigner
 				menu.AddItem(new GUIContent("Add Vertical Line"), false, StartAddingVerticalLine);
 				menu.AddSeparator("");
 				if (SelectedIndicesX.Count > 0 || SelectedIndicesY.Count > 0)
-					menu.AddItem(new GUIContent("Delete Selected Lines\tDel"), false, DeleteSelectedLines);
+					menu.AddItem(new GUIContent("Delete Selected Lines	Del"), false, DeleteSelectedLines);
 				else
-					menu.AddDisabledItem(new GUIContent("Delete Selected Lines\tDel"));
+					menu.AddDisabledItem(new GUIContent("Delete Selected Lines	Del"));
 				
 				menu.AddSeparator("");
 				menu.AddItem(new GUIContent("Exit Edit Mode"), false, ExitEditMode);
@@ -189,13 +189,8 @@ namespace AZSoftStudio.UIFurnace.LayoutDesigner
 				
 				if (e.type == EventType.Repaint)
 				{
-					// Match the actual grid line's color when dragging/hovering
-					Color baseColor = WithOpacity(GridSettings.GridColor);
-					float h, s, v; Color.RGBToHSV(baseColor, out h, out s, out v);
-					float dragHue = (h + 0.25f) % 1f;
-					Color dragColor = Color.HSVToRGB(dragHue, Mathf.Max(0.5f, s), Mathf.Max(0.6f, v));
-					dragColor.a = baseColor.a;
-
+					// Adaptive high-visibility preview color with guaranteed full opacity
+					Color dragColor = GetAdaptivePreviewColor();
 					EditorGUIUtility.AddCursorRect(new Rect(0,0,10000,10000), MouseCursor.ArrowPlus, controlID);
 					Handles.color = dragColor;
 
@@ -209,7 +204,7 @@ namespace AZSoftStudio.UIFurnace.LayoutDesigner
 						float snappedProj = ApplySnap(rawProj, s_SnapWorldLinesX, s_SnapSourcesX);
 						float t = snappedProj / canvasWidth;
 						Vector3 lockedPos = center + right * (t * canvasWidth);
-						DrawCrispLine(GridSettings.GridThickness, lockedPos - up * halfHeight, lockedPos + up * halfHeight);
+						DrawCrispLine(GridSettings.GridThickness + 1f, lockedPos - up * halfHeight, lockedPos + up * halfHeight);
 						// #8 Ã¢â‚¬â€ Ghost mirror preview
 						if (GridSettings.IsMirrorModeActive)
 						{
@@ -231,7 +226,7 @@ namespace AZSoftStudio.UIFurnace.LayoutDesigner
 						float snappedProj = ApplySnap(rawProj, s_SnapWorldLinesY, s_SnapSourcesY);
 						float t = snappedProj / canvasHeight;
 						Vector3 lockedPos = center + up * (t * canvasHeight);
-						DrawCrispLine(GridSettings.GridThickness, lockedPos - right * halfWidth, lockedPos + right * halfWidth);
+						DrawCrispLine(GridSettings.GridThickness + 1f, lockedPos - right * halfWidth, lockedPos + right * halfWidth);
 						// #8 â€” Ghost mirror preview
 						if (GridSettings.IsMirrorModeActive)
 						{
@@ -317,7 +312,7 @@ namespace AZSoftStudio.UIFurnace.LayoutDesigner
 
 				if (e.type == EventType.Repaint)
 				{
-					Color dragColor = new Color(0.2f, 0.8f, 1f, 1f); // Crisp cyan matching selectedColor
+					Color dragColor = GetAdaptivePreviewColor();
 
 					EditorGUIUtility.AddCursorRect(new Rect(0, 0, 10000, 10000), s_IsHoveringDeleteZone ? MouseCursor.ArrowMinus : (s_AxisDragIsVertical ? MouseCursor.ResizeHorizontal : MouseCursor.ResizeVertical), controlID);
 					Handles.color = dragColor;
@@ -330,7 +325,7 @@ namespace AZSoftStudio.UIFurnace.LayoutDesigner
 						float rawProj = Vector3.Dot(mouseWorldPos - center, right);
 						float snappedProj = ApplySnap(rawProj, s_SnapWorldLinesX, s_SnapSourcesX);
 						Vector3 lockedPos = center + right * snappedProj;
-						DrawCrispLine(GridSettings.GridThickness, lockedPos - up * halfHeight, lockedPos + up * halfHeight);
+						DrawCrispLine(GridSettings.GridThickness + 1f, lockedPos - up * halfHeight, lockedPos + up * halfHeight);
 						// #8 Ã¢â‚¬â€ Ghost mirror preview for axis drag
 						if (GridSettings.IsMirrorModeActive)
 						{
@@ -352,7 +347,7 @@ namespace AZSoftStudio.UIFurnace.LayoutDesigner
 						float rawProj = Vector3.Dot(mouseWorldPos - center, up);
 						float snappedProj = ApplySnap(rawProj, s_SnapWorldLinesY, s_SnapSourcesY);
 						Vector3 lockedPos = center + up * snappedProj;
-						DrawCrispLine(GridSettings.GridThickness, lockedPos - right * halfWidth, lockedPos + right * halfWidth);
+						DrawCrispLine(GridSettings.GridThickness + 1f, lockedPos - right * halfWidth, lockedPos + right * halfWidth);
 						// #8 ── Ghost mirror preview for axis drag
 						if (GridSettings.IsMirrorModeActive)
 						{
